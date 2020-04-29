@@ -49,7 +49,7 @@ services:
             - base
         volumes:
             - ../data:/data
-            - ../migration-networks/common/ingest/src:/src
+            - ../src:/src
         command: ["src/exe.sh"]
 
 volumes:
