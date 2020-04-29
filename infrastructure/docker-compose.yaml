@@ -1,0 +1,45 @@
+version: "3.5"
+
+services:
+    base:
+        build:
+            dockerfile: Dockerfile.base
+            context: ./base
+        image: ollin18/base:0.1
+        container_name: base
+    neo4j:
+        build:
+            dockerfile: Dockerfile.db
+            context: ./neo4j
+        image: ollin18/migration:0.1
+        container_name: migration_db
+        depends_on:
+            - ingest
+        environment:
+            - NEO4J_AUTH=none
+        ports:
+            - "7474:7474"
+            - "7687:7687"
+        volumes:
+            - ../data/nodes/list:/nodes/list
+            - ../data/edges/list:/edges/list
+            - ../data/nodes/headers:/nodes/headers
+            - ../data/edges/headers:/edges/headers
+    ingest:
+        build:
+            dockerfile: Dockerfile
+            context: ./ingest
+        image: ingest
+        container_name: ingester
+        depends_on:
+            - base
+        volumes:
+            - ../data:/data
+            - ../migration-networks/common/ingest/src:/src
+        command: ["src/exe.sh"]
+
+volumes:
+    data:
+    datasc:
+    nodes:
+    edges:
