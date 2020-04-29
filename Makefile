@@ -40,98 +40,93 @@ prepare: deps
 deps: pip airdb
 
 pip: requirements.txt
-    @pip install -r $<
+	@pip install -r $<
 
 airdb:
-    @source .env
-    --directory=$(AIRFLOW_HOME)
-    @airflow initdb
+	@source .env
+	--directory=$(AIRFLOW_HOME)
+	@airflow initdb
 
 info:
-    @echo Project: $(PROJECT_NAME) ver. $(PROJECT_VERSION) in $(PROJ_DIR)
-    @python --version
-    # @pyenv --version
-    @pip --version
+	@echo Project: $(PROJECT_NAME) ver. $(PROJECT_VERSION) in $(PROJ_DIR)
+	@python --version
+	# @pyenv --version
+	@pip --version
 
 deldata:
-    @ yes | rm data/raw/* data/clean/* data/nodes/headers/* data/nodes/list/* data/edges/headers/* data/edges/list/*
+	@ yes | rm data/raw/* data/clean/* data/nodes/headers/* data/nodes/list/* data/edges/headers/* data/edges/list/*
 
 getdata:
-    @docker run --rm -v $(PROJ_DIR)/data:/data -v $(PROJ_DIR)/src/ingest/src/:/src ingest /src/exe.sh
+	@docker run --rm -v $(PROJ_DIR)/data:/data -v $(PROJ_DIR)/src/ingest/src/:/src ingest /src/exe.sh
 
 ########################################
 ##          Infrastructure            ##
 ##    	   Execution Tasks            ##
 ########################################
 
-create: ##@infrastructure Crea infraestructura necesaria: Pull de imágenes y crea el storage local
-    $(MAKE) --directory=infrastructure create
+create: ##@infrastructure Builds the required containers
+	$(MAKE) --directory=infrastructure build
 
-start: create ##@infraestructura Inicializa la infraestructura y ejecuta el entrenamiento
-    $(MAKE) --directory=infrastructure start
+start: build ##@infraestructura Starts the Docker Compose and build the images if required
+	$(MAKE) --directory=infrastructure init
 
-stop: ##@infrastructure Detiene la infrastructure
-    $(MAKE) --directory=infrastructure stop
+stop: ##@infrastructure Stops the Docker Compose infrastructure
+	$(MAKE) --directory=infrastructure stop
 
-status: ##@infrastructure Informa el estatus de la infrastructure
-    $(MAKE) --directory=infrastructure status
+status: ##@infrastructure Infrastructure status
+	$(MAKE) --directory=infrastructure status
 
-logs:   ##@infrastructure Despliega en pantalla las salidas de los logs de la infrastructure
-    $(MAKE) --directory=infrastructure logs
+destroy: ##@infrastructure Delete the docker images
+	$(MAKE) --directory=infrastructure clean
+	@docker rmi ollin18/planea:0.1 ingest:latest
 
-restart: ##@infrastructure Reinicializa la infrastructure
-    $(MAKE) --directory=infrastructure restart
-
-destroy: ##@infrastructure Destruye la infrastructure
-    $(MAKE) --directory=infrastructure clean
-    @docker rmi ollin18/migration:0.1 ingest:latest
-
-nuke: ##@infrastructure Destruye la infrastructure (incluyendo las imágenes)
-    $(MAKE) --directory=infrastructure nuke
+nuke: ##@infrastructure Destroy all infrastructure (TODO)
+	$(MAKE) --directory=infrastructure nuke
 
 neo4j:
-    @$(MAKE) --directory=infrastructure init
+	@$(MAKE) --directory=infrastructure init
 
-neo4jrebuild:
-    @$(MAKE) --directory=infrastructure rebuild
+# neo4jrebuild:
+#     @$(MAKE) --directory=infrastructure rebuild
+
 ingest:
-    @$(MAKE) --directory=infrastructure ingester
+	@$(MAKE) --directory=infrastructure ingester
 
 dockerbuild:
-    @$(MAKE) --directory=infrastructure build
+	@$(MAKE) --directory=infrastructure build
 
 ########################################
 ##           Data Sync Tasks          ##
 ########################################
 
 sync_to_gs: ##@data Sincroniza los datos hacia GCP GS
-    @gsutil -m rsync -R data/ $(GS_BUCKET)/data/
+	@gsutil -m rsync -R data/ $(GS_BUCKET)/data/
 
 sync_from_gs: ##@data Sincroniza los datos desde GCP GS
-    @gsutil -m rsync -R $(GS_BUCKET)/data/ data/
+	@gsutil -m rsync -R $(GS_BUCKET)/data/ data/
 
 ########################################
 ##          Project Tasks             ##
 ########################################
 
 run:       ##@proyecto Ejecuta el pipeline de datos
-    $(MAKE) --directory=$(PROJECT_NAME) run
+	$(MAKE) --directory=$(PROJECT_NAME) run
 
 setup: build install ##@proyecto Crea las imágenes del pipeline e instala el pipeline como paquete en el PYTHONPATH
 
 build:
-    $(MAKE) --directory=$(PROJECT_NAME) build
+	$(MAKE) --directory=$(PROJECT_NAME) build
 
 install:
-    @pip install --editable .
+	@pip install --editable .
 
 uninstall:
-    @while pip uninstall -y ${PROJECT_NAME}; do true; done
-    @python setup.py clean
+	@while pip uninstall -y ${PROJECT_NAME}; do true; done
+	@python setup.py clean
 
 ## Verificando dependencias
 ## Basado en código de Fernando Cisneros @ datank
 
 EXECUTABLES = docker docker-compose docker-machine rg pip
 TEST_EXEC := $(foreach exec,$(EXECUTABLES),\
-                $(if $(shell which $(exec)), some string, $(error "${BOLD}${RED}ERROR${RESET}: $(exec) is not in the PATH")))
+				$(if $(shell which $(exec)), some string, $(error "${BOLD}${RED}ERROR${RESET}: $(exec) is not in the PATH")))

@@ -3,8 +3,11 @@ from ubuntu:18.04
 maintainer Ollin Demian Langle Chimal <Ollin.Langle@uvm.edu>
 
 env refreshed_at 2020-04-29
+env DEBIAN_FRONTEND=noninteractive
 
-run apt-get update && apt-get -y install build-essential
+run apt-get update && apt-get -y install build-essential tzdata
+run ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime
+run dpkg-reconfigure --frontend noninteractive tzdata
 run apt-get -y install software-properties-common
 run apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9 && add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu bionic-cran35/'
 run apt-get update

@@ -27,7 +27,7 @@ services:
             - ../data/edges/headers:/edges/headers
     postgres:
         image: postgres:9.6
-        depends_on: :
+        depends_on:
             - ingest
         environment:
             - POSTGRES_USER=planea
