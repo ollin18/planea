@@ -9,10 +9,10 @@ services:
         container_name: base
     neo4j:
         build:
-            dockerfile: Dockerfile.db
+            dockerfile: Dockerfile.neo4j
             context: ./neo4j
         image: ollin18/planea:0.1
-        container_name: planea_db
+        container_name: planea_neo4j
         depends_on:
             - ingest
         environment:
@@ -25,6 +25,18 @@ services:
             - ../data/edges/list:/edges/list
             - ../data/nodes/headers:/nodes/headers
             - ../data/edges/headers:/edges/headers
+    postgres:
+        image: postgres:9.6
+        environment:
+            - POSTGRES_USER=planea
+            - POSTGRES_PASSWORD=planea
+            - POSTGRES_DB=planea
+        logging:
+            options:
+                max-size: 20m
+                max-file: "5"
+        volumes:
+            - ../data/postgres:/var/lib/postgresql/data
     ingest:
         build:
             dockerfile: Dockerfile
