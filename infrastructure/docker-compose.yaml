@@ -11,8 +11,8 @@ services:
         build:
             dockerfile: Dockerfile.db
             context: ./neo4j
-        image: ollin18/migration:0.1
-        container_name: migration_db
+        image: ollin18/planea:0.1
+        container_name: planea_db
         depends_on:
             - ingest
         environment:

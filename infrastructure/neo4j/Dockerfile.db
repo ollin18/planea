@@ -2,7 +2,7 @@ from ollin18/base:0.1
 
 MAINTAINER Ollin Demian Langle Chimal <Ollin.Langle@uvm.edu>
 
-ENV REFRESHED_AT 2019-03-22
+ENV REFRESHED_AT 2020-04-29
 
 ADD http://dist.neo4j.org/neo4j-enterprise-3.4.10-unix.tar.gz /var/lib
 RUN tar -xzvf /var/lib/neo4j-enterprise-3.4.10-unix.tar.gz
