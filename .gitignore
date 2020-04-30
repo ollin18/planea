@@ -128,3 +128,5 @@ dmypy.json
 *.xlsx
 *.zip
 *.db
+
+airflow_home/logs/
