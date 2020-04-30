@@ -15,7 +15,8 @@ default_args = {
         'depends_on_past': False,
         # If we want to select a specific launch date
         # 'start_date': datetime(2020,4,29),
-        'start_date': days_ago(2),
+        # 'start_date': '2020-01-01',
+        'start_date': days_ago(7),
         'email': ['olangle@uvm.edu'],
         'email_on_failure': False,
         'email_on_retry': False,
@@ -28,7 +29,7 @@ dag = DAG(
     'ingest',
     default_args=default_args,
     description='Ingestion of the required files',
-    schedule_interval=timedelta(days=1),
+    schedule_interval=timedelta(days=10),
 #     This can also be a common cron job
 #     schedule_interval= '*/5 * * * *'
 )

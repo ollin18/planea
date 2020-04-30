@@ -15,6 +15,7 @@ PROJ_DIR:=$(shell pwd)
 
 PROJECT_NAME:=$(shell cat .project-name)
 PROJECT_VERSION:=$(shell cat .project-version)
+DATE:=$(shell date +'%Y-%m-%d')
 
 ## Python Version
 VERSION_PYTHON:=$(shell python -V)
@@ -44,21 +45,22 @@ pip: requirements.txt
 
 airdb:
 	@source .env
-	--directory=$(AIRFLOW_HOME)
+	# --directory=$(AIRFLOW_HOME)
 	@airflow initdb
 
 info:
 	@echo Project: $(PROJECT_NAME) ver. $(PROJECT_VERSION) in $(PROJ_DIR)
 	@python --version
-	# @pyenv --version
 	@pip --version
 
 deldata:
-	@ yes | rm data/raw/* data/clean/* data/nodes/headers/* data/nodes/list/* data/edges/headers/* data/edges/list/*
+	@ yes | rm data/raw/* data/clean/*
 
 getdata:
-	@docker run --rm -v $(PROJ_DIR)/data:/data -v $(PROJ_DIR)/src/ingest/:/src ingest /src/conapo.sh
+	@airflow backfill ingest -s $(DATE)
 
+prune:
+	@docker container prune
 ########################################
 ##          Infrastructure            ##
 ##    	   Execution Tasks            ##
