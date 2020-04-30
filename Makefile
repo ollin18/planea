@@ -57,7 +57,7 @@ deldata:
 	@ yes | rm data/raw/* data/clean/* data/nodes/headers/* data/nodes/list/* data/edges/headers/* data/edges/list/*
 
 getdata:
-	@docker run --rm -v $(PROJ_DIR)/data:/data -v $(PROJ_DIR)/src/ingest/src/:/src ingest /src/exe.sh
+	@docker run --rm -v $(PROJ_DIR)/data:/data -v $(PROJ_DIR)/src/ingest/:/src ingest /src/conapo.sh
 
 ########################################
 ##          Infrastructure            ##

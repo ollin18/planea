@@ -1,6 +1,6 @@
-from ollin18/base:0.1
+FROM ollin18/base:0.1
 
-MAINTAINER Ollin Demian Langle Chimal <Ollin.Langle@uvm.edu>
+LABEL maintainer="Ollin Demian Langle Chimal <Ollin.Langle@uvm.edu>"
 
 ENV REFRESHED_AT 2020-04-29
 

@@ -1,13 +1,15 @@
-from ollin18/base:0.1
+FROM ollin18/base:0.1
 
-MAINTAINER Ollin Demian Langle Chimal <Ollin.Langle@uvm.edu>
+LABEL maintainer="Ollin Demian Langle Chimal <Ollin.Langle@uvm.edu>"
+ENV REFRESHED_AT 2020-04-29
 
-RUN apt-get update && apt-get -y install python3-requests
+RUN apt-get update && apt-get -y install python3-requests unrar
 
 ADD requirements.txt requirements.txt
 
 RUN pip3 install -r requirements.txt
 
-ENV REFRESHED_AT 2019-04-03
+RUN mkdir /data /src
+
 
 CMD ["bash"]
