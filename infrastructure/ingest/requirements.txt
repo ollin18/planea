@@ -1,3 +1,4 @@
 csvkit
 requests
 pandas
+tableschema

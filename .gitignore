@@ -130,3 +130,17 @@ dmypy.json
 *.db
 
 airflow_home/logs/
+
+data/sql/conapo.sql
+
+data/clean/conapo.sql
+
+data/sql/indigenous_language.sql
+
+data/sql/marginalization.sql
+
+data/sql/tr_centros.sql
+
+data/sql/tr_conafe.sql
+
+data/sql/tr_inmuebles.sql

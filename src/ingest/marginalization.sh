@@ -13,5 +13,6 @@ sed -i 's/| /|/g' /data/raw/marginalization.csv
 sed  -i 's/\s*|/|/g' /data/raw/marginalization.csv
 
 mv /data/raw/marginalization.csv /data/clean/marginalization.csv
+csvsql -d "|" /data/clean/marginalization.csv > /data/sql/marginalization.sql
 
 rm /data/raw/*

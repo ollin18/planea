@@ -9,8 +9,16 @@ unzip /data/raw/centros_escolares.zip -d /data/raw/
 unzip /data/raw/conafe.zip -d /data/raw/
 unzip /data/raw/inmuebles.zip -d /data/raw/
 
-cat /data/raw/tr_centros.csv | csvformat -D "|" > /data/clean/tr_centros.csv
-cat /data/raw/tr_conafe.csv | csvformat -D "|" > /data/clean/tr_conafe.csv
-cat /data/raw/tr_inmuebles.csv | csvformat -D "|" > /data/clean/tr_inmuebles.csv
+iconv -f ISO-8859-1//TRANSLIT -t UTF-8 /data/raw/tr_centros.csv > /data/raw/utf_tr_centros.csv
+iconv -f ISO-8859-1//TRANSLIT -t UTF-8 /data/raw/tr_conafe.csv > /data/raw/utf_tr_conafe.csv
+iconv -f ISO-8859-1//TRANSLIT -t UTF-8 /data/raw/tr_inmuebles.csv > /data/raw/utf_tr_inmuebles.csv
+
+cat /data/raw/utf_tr_centros.csv | csvformat -D "|" > /data/clean/tr_centros.csv
+cat /data/raw/utf_tr_conafe.csv | csvformat -D "|" > /data/clean/tr_conafe.csv
+cat /data/raw/utf_tr_inmuebles.csv | csvformat -D "|" > /data/clean/tr_inmuebles.csv
+
+csvsql -d "|" /data/clean/tr_centros.csv > /data/sql/tr_centros.sql
+csvsql -d "|" /data/clean/tr_conafe.csv > /data/sql/tr_conafe.sql
+csvsql -d "|" /data/clean/tr_inmuebles.csv > /data/sql/tr_inmuebles.sql
 
 rm /data/raw/*

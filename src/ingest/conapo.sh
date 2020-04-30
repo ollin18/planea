@@ -17,4 +17,6 @@ iconv -f ISO-8859-1//TRANSLIT -t UTF-8 /data/raw/conapo_2.csv > /data/raw/utf_co
 
 cat /data/raw/utf_conapo_1.csv /data/raw/utf_conapo_2.csv | csvformat -D "|" > /data/clean/conapo.csv
 
+csvsql -d "|" /data/clean/conapo.csv > /data/sql/conapo.sql
+
 rm /data/raw/*
