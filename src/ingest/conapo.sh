@@ -12,6 +12,9 @@ cat /data/raw/base_municipios_final_datos_01.csv | sed '1d' | sed '1i RENGLON,CL
 
 cat /data/raw/base_municipios_final_datos_02.csv | sed '1d' |  cut -d"," -f2- > /data/raw/conapo_2.csv
 
-cat /data/raw/conapo_1.csv /data/raw/conapo_2.csv | csvformat -D "|" > /data/clean/conapo.csv
+iconv -f ISO-8859-1//TRANSLIT -t UTF-8 /data/raw/conapo_1.csv > /data/raw/utf_conapo_1.csv
+iconv -f ISO-8859-1//TRANSLIT -t UTF-8 /data/raw/conapo_2.csv > /data/raw/utf_conapo_2.csv
+
+cat /data/raw/utf_conapo_1.csv /data/raw/utf_conapo_2.csv | csvformat -D "|" > /data/clean/conapo.csv
 
 rm /data/raw/*

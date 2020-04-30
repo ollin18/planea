@@ -9,8 +9,8 @@ unzip /data/raw/centros_escolares.zip -d /data/raw/
 unzip /data/raw/conafe.zip -d /data/raw/
 unzip /data/raw/inmuebles.zip -d /data/raw/
 
-cat /data/raw/tr_centros.csv | csvkit -D "|" > /data/clean/tr_centros.csv
-cat /data/raw/tr_conafe.csv | csvkit -D "|" > /data/clean/tr_conafe.csv
-cat /data/raw/tr_inmuebles.csv | csvkit -D "|" > /data/clean/tr_inmuebles.csv
+cat /data/raw/tr_centros.csv | csvformat -D "|" > /data/clean/tr_centros.csv
+cat /data/raw/tr_conafe.csv | csvformat -D "|" > /data/clean/tr_conafe.csv
+cat /data/raw/tr_inmuebles.csv | csvformat -D "|" > /data/clean/tr_inmuebles.csv
 
 rm /data/raw/*

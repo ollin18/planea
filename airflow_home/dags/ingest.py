@@ -6,6 +6,9 @@ from airflow.operators.bash_operator import BashOperator
 from airflow.operators.docker_operator import DockerOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.utils.dates import days_ago
+import os
+
+wd = os.getcwd()
 
 default_args = {
         'owner': 'airflow',
@@ -33,39 +36,36 @@ dag = DAG(
 conapo_ingest = DockerOperator(
         task_id='conapo',
         image='ingest',
-        command='/src/conapo.sh', \
+        volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
+        command='/src/conapo.sh ', \
         dag = dag)
 
-indigenous_ingest = BashOperator(
+indigenous_ingest = DockerOperator(
         task_id='indigenous',
-        bash_command='docker run \
-                -v $(pwd)/data/:/data\
-                -v $(pwd)/src/ingest/:/src\
-                        ingest /src/indigenous_language.sh', \
+        image='ingest',
+        volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
+        command='/src/indigenous_language.sh ', \
         dag = dag)
 
-marginalization_ingest = BashOperator(
+marginalization_ingest = DockerOperator(
         task_id='marginalization',
-        bash_command='docker run \
-                -v $(pwd)/data/:/data\
-                -v $(pwd)/src/ingest/:/src\
-                        ingest /src/marginalization.sh', \
+        image='ingest',
+        volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
+        command='/src/marginalization.sh ', \
         dag = dag)
 
-schools_ingest = BashOperator(
+schools_ingest = DockerOperator(
         task_id='schools',
-        bash_command='docker run \
-                -v $(pwd)/data/:/data\
-                -v $(pwd)/src/ingest/:/src\
-                        ingest /src/marginalization.sh', \
+        image='ingest',
+        volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
+        command='/src/schools.sh ', \
         dag = dag)
 
-geoms_ingest = BashOperator(
+geoms_ingest = DockerOperator(
         task_id='geoms',
-        bash_command='docker run \
-                -v $(pwd)/data/:/data\
-                -v $(pwd)/src/ingest/:/src\
-                        ingest /src/marginalization.sh', \
+        image='ingest',
+        volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
+        command='/src/geoms.sh ', \
         dag = dag)
 
 
