@@ -17,6 +17,7 @@ RUN tar -xvf /tmp/julia-1.2.0-linux-x86_64.tar.gz
 RUN mv julia-1.2.0 /usr/local/bin/julia
 
 # We need spanish for compatibility with our data
+# Still don't know
 # RUN echo "es_MX.UTF-8 UTF-8" >> /etc/locale.gen \
 #     && locale-gen es_MX.UTF-8 es_MX\
 #     && /usr/sbin/update-locale LANG=es_MX.UTF-8 \

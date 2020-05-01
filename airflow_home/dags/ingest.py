@@ -101,4 +101,7 @@ geoms_schemas = BashOperator(
                         -c \"copy geom_muni from stdin with (format csv, DELIMITER '|', header true);\"",
         dag = dag)
 
-conapo_ingest >> indigenous_ingest >> marginalization_ingest >> schools_ingest >> geoms_ingest >> (conapo_schemas, indigenous_schemas, marginalization_schemas, geoms_schemas)
+conapo_ingest >> conapo_schemas
+indigenous_ingest >> indigenous_schemas
+(marginalization_ingest,schools_ingest) >> marginalization_schemas
+geoms_ingest >> geoms_schemas

@@ -69,7 +69,7 @@ prune:
 create: ##@infrastructure Builds the required containers
 	$(MAKE) --directory=infrastructure build
 
-start: build ##@infraestructura Starts the Docker Compose and build the images if required
+start: up ##@infraestructura Starts the Docker Compose and build the images if required
 	$(MAKE) --directory=infrastructure init
 
 stop: ##@infrastructure Stops the Docker Compose infrastructure
