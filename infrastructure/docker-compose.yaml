@@ -7,44 +7,36 @@ services:
             context: ./base
         image: ollin18/base:0.1
         container_name: base
-    neo4j:
-        build:
-            dockerfile: Dockerfile
-            context: ./neo4j
-        image: ollin18/neoplanea:0.1
-        container_name: neoplanea
-        depends_on:
-            - base
-        environment:
-            - NEO4J_AUTH=none
-        ports:
-            - "7474:7474"
-            - "7687:7687"
-        volumes:
-            - ../data/nodes/list:/nodes/list
-            - ../data/edges/list:/edges/list
-            - ../data/nodes/headers:/nodes/headers
-            - ../data/edges/headers:/edges/headers
+    # neo4j:
+    #     build:
+    #         dockerfile: Dockerfile
+    #         context: ./neo4j
+    #     image: ollin18/neoplanea:0.1
+    #     container_name: neoplanea
+    #     depends_on:
+    #         - base
+    #     environment:
+    #         - NEO4J_AUTH=none
+    #     ports:
+    #         - "7474:7474"
+    #         - "7687:7687"
+    #     volumes:
+    #         - ../data/nodes/list:/nodes/list
+    #         - ../data/edges/list:/edges/list
+    #         - ../data/nodes/headers:/nodes/headers
+    #         - ../data/edges/headers:/edges/headers
     postgres:
-        build:
-            dockerfile: Dockerfile
-            context: ./postgres
-        image: ollin18/postgres:9.6
-        depends_on:
-            - base
-        ports:
-            - "5433:5432"
+        image: "postgres:11"
+        container_name: planeadb
         environment:
             - POSTGRES_USER=planea
             - POSTGRES_PASSWORD=planea
             - POSTGRES_DB=planea
             - PGDATA=/var/lib/postgresql/data/pgdata
-        logging:
-            options:
-                max-size: 20m
-                max-file: "5"
+        ports:
+            - "5432:5432"
         volumes:
-            - ../data/:/var/lib/postgresql/data
+            - ../data/clean:/var/lib/postgresql/data
     ingest:
         build:
             dockerfile: Dockerfile
@@ -59,7 +51,8 @@ services:
         # command: ["src/exe.sh"]
 
 volumes:
+    my_dbdata:
     data:
     datasc:
-    nodes:
-    edges:
+    # nodes:
+    # edges:

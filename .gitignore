@@ -144,3 +144,15 @@ data/sql/tr_centros.sql
 data/sql/tr_conafe.sql
 
 data/sql/tr_inmuebles.sql
+
+data/clean/geom_muni.sql
+
+data/clean/indigenous_language.sql
+
+data/clean/marginalization.sql
+
+data/clean/tr_centros.sql
+
+data/clean/tr_conafe.sql
+
+data/clean/tr_inmuebles.sql

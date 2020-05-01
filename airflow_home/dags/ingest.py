@@ -69,5 +69,36 @@ geoms_ingest = DockerOperator(
         command='/src/geoms.sh ', \
         dag = dag)
 
+conapo_schemas = BashOperator(
+        task_id='conapo_schemas',
+        bash_command="docker cp "+wd+"/data/sql/conapo.sql planeadb:/var/lib/postgresql/data/conapo.sql &&\
+                docker exec -u postgres planeadb psql planea planea -f /var/lib/postgresql/data/conapo.sql &&\
+                cat "+wd+"/data/clean/conapo.csv| docker exec -i planeadb psql -U planea \
+                        -c \"copy conapo from stdin with (format csv, DELIMITER '|', header true);\"",
+        dag = dag)
 
-conapo_ingest >> indigenous_ingest >> marginalization_ingest >> schools_ingest >> geoms_ingest
+indigenous_schemas = BashOperator(
+        task_id='indigenous_schemas',
+        bash_command="docker cp "+wd+"/data/sql/indigenous_language.sql planeadb:/var/lib/postgresql/data/indigenous_language.sql &&\
+                docker exec -u postgres planeadb psql planea planea -f /var/lib/postgresql/data/indigenous_language.sql &&\
+                cat "+wd+"/data/clean/indigenous_language.csv| docker exec -i planeadb psql -U planea \
+                        -c \"copy indigenous_language from stdin with (format csv, DELIMITER '|', header true);\"",
+        dag = dag)
+
+marginalization_schemas = BashOperator(
+        task_id='marginalization_schemas',
+        bash_command="docker cp "+wd+"/data/sql/marginalization.sql planeadb:/var/lib/postgresql/data/marginalization.sql &&\
+                docker exec -u postgres planeadb psql planea planea -f /var/lib/postgresql/data/marginalization.sql &&\
+                cat "+wd+"/data/clean/marginalization.csv| docker exec -i planeadb psql -U planea \
+                        -c \"copy marginalization from stdin with (format csv, DELIMITER '|', header true);\"",
+        dag = dag)
+
+geoms_schemas = BashOperator(
+        task_id='geoms_schemas',
+        bash_command="docker cp "+wd+"/data/sql/geom_muni.sql planeadb:/var/lib/postgresql/data/geom_muni.sql &&\
+                docker exec -u postgres planeadb psql planea planea -f /var/lib/postgresql/data/geom_muni.sql &&\
+                cat "+wd+"/data/clean/geom_muni.csv| docker exec -i planeadb psql -U planea \
+                        -c \"copy geom_muni from stdin with (format csv, DELIMITER '|', header true);\"",
+        dag = dag)
+
+conapo_ingest >> indigenous_ingest >> marginalization_ingest >> schools_ingest >> geoms_ingest >> (conapo_schemas, indigenous_schemas, marginalization_schemas, geoms_schemas)
