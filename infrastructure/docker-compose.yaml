@@ -11,10 +11,10 @@ services:
         build:
             dockerfile: Dockerfile
             context: ./neo4j
-        image: ollin18/planea:0.1
-        container_name: planea_neo4j
+        image: ollin18/neoplanea:0.1
+        container_name: neoplanea
         depends_on:
-            - ingest
+            - base
         environment:
             - NEO4J_AUTH=none
         ports:
@@ -26,15 +26,19 @@ services:
             - ../data/nodes/headers:/nodes/headers
             - ../data/edges/headers:/edges/headers
     postgres:
-        image: postgres:9.6
+        build:
+            dockerfile: Dockerfile
+            context: ./postgres
+        image: ollin18/postgres:9.6
         depends_on:
-            - ingest
+            - base
         ports:
-            - "5432:5432"
+            - "5433:5432"
         environment:
             - POSTGRES_USER=planea
             - POSTGRES_PASSWORD=planea
             - POSTGRES_DB=planea
+            - PGDATA=/var/lib/postgresql/data/pgdata
         logging:
             options:
                 max-size: 20m
@@ -52,7 +56,7 @@ services:
         volumes:
             - ../data:/data
             - ../src:/src
-        command: ["src/exe.sh"]
+        # command: ["src/exe.sh"]
 
 volumes:
     data:
