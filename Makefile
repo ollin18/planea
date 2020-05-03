@@ -67,7 +67,7 @@ prune:
 ########################################
 
 create: ##@infrastructure Builds the required containers
-	$(MAKE) --directory=infrastructure build
+	$(MAKE) -c=infrastructure --directory=infrastructure build
 
 start: up ##@infraestructura Starts the Docker Compose and build the images if required
 	$(MAKE) --directory=infrastructure init

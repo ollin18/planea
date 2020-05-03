@@ -156,3 +156,7 @@ data/clean/tr_centros.sql
 data/clean/tr_conafe.sql
 
 data/clean/tr_inmuebles.sql
+
+*.xlsx#
+
+data/clean/planea.sql

@@ -34,6 +34,13 @@ dag = DAG(
 #     schedule_interval= '*/5 * * * *'
 )
 
+planea_ingest = DockerOperator(
+        task_id='planea',
+        image='ingest',
+        volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
+        command='/src/planea.py ', \
+        dag = dag)
+
 conapo_ingest = DockerOperator(
         task_id='conapo',
         image='ingest',
@@ -67,6 +74,14 @@ geoms_ingest = DockerOperator(
         image='ingest',
         volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
         command='/src/geoms.sh ', \
+        dag = dag)
+
+planea_schemas = BashOperator(
+        task_id='planea_schemas',
+        bash_command="docker cp "+wd+"/data/sql/planea.sql planeadb:/var/lib/postgresql/data/planea.sql &&\
+                docker exec -u postgres planeadb psql planea planea -f /var/lib/postgresql/data/planea.sql &&\
+                cat "+wd+"/data/clean/planea.csv| docker exec -i planeadb psql -U planea \
+                        -c \"copy planea from stdin with (format csv, DELIMITER '|', header true);\"",
         dag = dag)
 
 conapo_schemas = BashOperator(
@@ -103,5 +118,5 @@ geoms_schemas = BashOperator(
 
 conapo_ingest >> conapo_schemas
 indigenous_ingest >> indigenous_schemas
-(marginalization_ingest,schools_ingest) >> marginalization_schemas
+(planea_ingest, marginalization_ingest,schools_ingest) >> planea_schemas >> marginalization_schemas
 geoms_ingest >> geoms_schemas
