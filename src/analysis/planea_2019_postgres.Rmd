@@ -1,0 +1,1340 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+#  This is for the latest 2019 PLANEA test!
+
+```{r,echo=FALSE,warning=FALSE,include=FALSE}
+paquetines <- c("readxl","magrittr","dplyr","ggplot2","tidyr","readr","stringr","fuzzyjoin","rstan","DBI","RPostgreSQL","rangeMapper","bnlearn","BiocManager")
+no_instalados <- paquetines[!(paquetines %in% installed.packages()[,"Package"])]
+if(length(no_instalados)) install.packages(no_instalados)
+# BiocManager::install("Rgraphviz")
+lapply(paquetines, library, character.only = TRUE)
+library(Rgraphviz)
+```
+
+
+Easy ggplot theme.
+```{r,echo=FALSE,waring=FALSE}
+th <- theme_minimal()+
+  theme(panel.grid.major.y = element_line(color = "gray"),
+        text = element_text(color = "gray20"),
+        axis.title.x = element_text(face="italic",size = 14),
+        axis.title.y = element_text(face="italic",size = 14),
+        axis.text = element_text(size=12),
+        legend.direction = "vertical",
+        legend.box = "vertical",
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14),
+        plot.caption = element_text(hjust=0),
+        plot.title = element_text(size = 16, face = "bold",hjust=0.39))
+```
+
+
+
+Let's define some function to interact easily with the database.
+```{r}
+#' @title plan_connect
+#'
+#' @description This function takes the Postgres environment variables
+#' to automatically connect to the planeadb database.
+#' The connection must be saved into a variable in order to
+#' use future functions. I'm cheating and not reading from .env.
+#'
+#' @examples con <- prev_connect()
+#'
+#' @param No parameter is needed.
+#' @export
+plan_connect <- function(){
+  DBI::dbConnect(RPostgreSQL::PostgreSQL(),
+  host     =  "localhost",
+  user     =  "planea",
+  password =  "planea",
+  port     =  5432,
+  dbname   =  "planea")
+}
+
+#' @title load_query
+#'
+#' @description Allows to run specific queries with the dbrsocial syntax.
+#'
+#' @param connection DBI connection. A connection to a database
+#' @param schema variable. A valid schema from a database on the
+#' @param the_table.  An existing table in the given schema.
+#' @param colums string. The columns in the database we want to retrieve
+#' information
+#' @param options string. Part of the SQL query with containing WHERE, ORDER,
+#' LIMIT and so statements
+#'
+#' @examples geom_muni <-
+#' load_query(con,raw,sifode,columns="entidadfederativa",options="WHERE
+#' mes='Abril'")
+#' @export
+load_query <- function(connection,schema,the_table,columns="*",options=""){
+    the_query <- "SELECT %s FROM %s.%s"
+    complete <- paste0(the_query," ",options)
+    schema    <- deparse(substitute(schema))
+    the_table <- deparse(substitute(the_table))
+    initial <- RPostgreSQL::dbSendQuery(connection,
+                             sprintf(complete,columns,schema,the_table))
+    return(initial)
+}
+
+#' @title load_table
+#'
+#' @description This function loads a connection to
+#' a given table from a particular schema in a database
+#' connection.
+#'
+#' @param connection DBI connection. A connection to a database
+#' must be open and given.
+#' @param schema variable. A valid schema from a database on the
+#' connected database.
+#' @param the_table. An existing table in the given schema.
+#'
+#' @examples the_dic<-load_table(con,raw,sifode_dic)
+#' @export
+load_table <- function(connection,schema,the_table){
+    the_query <- "SELECT * FROM %s.%s"
+    schema    <- deparse(substitute(schema))
+    the_table <- deparse(substitute(the_table))
+    initial <- RPostgreSQL::dbSendQuery(connection,
+                             sprintf(the_query,schema,the_table))
+}
+
+#' @title large_table
+#'
+#' @description This function loads a connection to a large table without
+#' loading it to memory.
+#'
+#' @param connection DBI connection. A connection to a database
+#' must be open and given.
+#' @param schema variable. A valid schema from a database on the
+#' connected database.
+#' @param the_table. An existing table in the given schema.
+#'
+#' @examples cuis_table <- large_table(con,raw,cuis_39_9)
+#' @export
+large_table <- function(connection,schema,the_table){
+    schema    <- deparse(substitute(schema))
+    the_table <- deparse(substitute(the_table))
+    retrieved <- dplyr::tbl(connection,dbplyr::in_schema(schema,the_table))
+    return(retrieved)
+}
+
+#' @title clear_results
+#'
+#' @description This function clears the results from a previous executed
+#' query.
+#'
+#' @param connection DBI connection. A connection to a database must be open and given.
+#'
+#' @examples clear_results(con)
+#' @export
+clear_results <- function(connection){
+    DBI::dbClearResult(DBI::dbListResults(connection)[[1]])
+}
+
+#' @title join_tables
+#'
+#' @description Returns a match between two tbl by defined key
+#' @param left_table a tbl-like object
+#' @param right_table a tbl-like object
+#' @param left_key the column name from left_table to compare
+#' @param right_key the column name from right_table to compare
+#'
+#' @examples join_tables(cuis_sample,llave_hogar_h,domicilios_sample_query,llave_hogar_h)
+#' @export
+join_tables <- function(left_table, left_key, right_table, right_key){
+    left_key <- substitute(left_key)
+    right_key <- deparse(substitute(right_key))
+    in_tables <- left_table %>%
+        dplyr::filter(left_key %in% right_table[[right_key]])
+    return(in_tables)
+}
+
+#' @title retrieve_result
+#'
+#' @description Return the fetch results of a query
+#' @param query An exec unfetched query
+#'
+#' @examples sample_table(load_table(prev_connect(),raw,sifode))
+#' @export
+retrieve_result <- function(query,n=-1,number=Inf){
+    if (class(query)[1] == "tbl_dbi"){
+        the_table <- dplyr::collect(query,n=number)
+        return(the_table)
+    }
+    else{
+    the_table <- DBI::dbFetch(query,n)
+    return(the_table)
+    }
+}
+
+#' @title load_geom
+#'
+#' @description Gives a "ready to go" data frame for geometry plotting
+#'
+#' @param connection DBI connection. A connection to a database
+#' @param schema variable. A valid schema from a database on the
+#' @param the_table.  An existing table in the given schema.
+#' @param colums string. The columns in the database we want to retrieve.
+#' Defaults cve_ent, cve_mun, cve_muni.
+#' @param geom_col . The name of the column in the database that contains a geometry
+#' @param col_shape. The name of the column that we want to use to join
+#' information
+#' @param options string. Part of the SQL query with containing WHERE, ORDER,
+#' LIMIT and so statements
+#'
+#' @examples geom_muni <- load_geom(con1,raw,geom_municipios,geom_col=geom,col_shape=cve_muni,options=options)
+#' @export
+load_geom <- function(connection,schema,the_table,columns="\"CVEGEO\", \"CVE_ENT\", \"CVE_MUN\"", geom_col, col_shape, options=""){
+    geom_col <- deparse(substitute(geom_col))
+    schema    <- deparse(substitute(schema))
+    the_table <- deparse(substitute(the_table))
+    col_shape <- deparse(substitute(col_shape))
+    geom_col2 <- paste0("\"",geom_col,"\"")
+
+    the_query <- "SELECT %s FROM %s.%s"
+    geom_col_as <- sprintf(", %s as geom",geom_col2)
+    columns <- paste0(columns,geom_col_as)
+    complete <- paste0(the_query," ",options)
+
+    initial <- RPostgreSQL::dbSendQuery(connection,
+                             sprintf(complete,columns,schema,the_table)) %>%
+    retrieve_result()
+
+    mun_shp = rangeMapper::WKT2SpatialPolygonsDataFrame(initial, geom = "geom", id = col_shape)
+    mun_df <- fortify(mun_shp, region = col_shape)
+    names(mun_df)[names(mun_df)=="id"] <- col_shape
+
+    return(mun_df)
+}
+
+#' @title discon_db
+#'
+#' @description This function disconnects a PostgreSQL
+#' connection.
+#'
+#' @param connection DBI connection. A connection to a database must be open and given.
+#'
+#' @examples discon_db(con)
+#' @export
+discon_db <- function(connection){
+    RPostgreSQL::dbDisconnect(connection)
+}
+```
+
+
+First we load the PLANEA results.
+```{r}
+# discon_db(con)
+con <- plan_connect()
+
+query <- load_table(con,public,planea)
+planea <- query %>% retrieve_result()
+clear_results(con)
+```
+
+We load the geometries but will use them later
+```{r}
+geom_muni <- load_geom(con,public,geom_muni,geom_col=WKT,col_shape=CVEGEO)
+```
+
+
+```{r}
+the_names <- colnames(planea)
+logros <- the_names[19:length((the_names))]
+planea[logros] <- sapply(planea[logros],as.numeric)
+planea$municipio <- planea$municipio %>% iconv(from="UTF-8",to="ASCII//TRANSLIT") %>% toupper()
+```
+
+
+We need to change some municipalities names in order to join this database with the CONAPO one.
+This are the missed-matched names in the tables of the database. I'll change the ones from the schools.
+```{r}
+from_schools <- c("CD. DEL CARMEN","DOCTOR BELISARIO DOMINGUEZ","TEMOSACHI","PEJPYON BLANCO","DOLORES HIDALGO","SILAO","ZAPOTLAN EL GRANDE (CIUDAD GUZMAN)","CUAUTITLAN (DE GARCIA BARRAGAN)","SAN MARTIN DE BOLA&OS","CA&ADAS DE OBREGON","SAN JOSE? DEL RINCON","VALLE DE CHALCO SOLIDARIDA","SAN MARTIN DE LAS PIRAMIDE","HEROICA ZITACUARO","TANHUATO DE GUERRERO","ARIO DE ROSALES","TUMBISCATIO DE RUIZ","JUNGAPEO DE JUAREZ","ACUITZIO DEL CANJE","SUSUPUATO DE GUERRERO","GABRIEL ZAMORA (LOMBARDIA)","BENITO JUAREZ (LAURELES)","HUETAMO DE NUNEZ","TIQUICHEO","TLALPUJAHUA DE RAYON","PARACHO DE VERDUZCO","DR. BESLISARIO DOMINGUEZ","TLALTIZAPAN","EL NAYAR","SAN MATEO YUCUTINDO","EL ROSARIO","ATLTZAYANCA","MEDELLIN DE BRAVO","NANCHITAL DE LAZARO CARDENAS DEL RI")
+
+to_conapo <- c("CARMEN","DR. BELISARIO DOMINGUEZ","TEMOSACHIC","PENON BLANCO","DOLORES HIDALGO CUNA DE LA INDEPENDENCIA NACIONAL","SILAO DE LA VICTORIA","ZAPOTLAN EL GRANDE","CUAUTITLAN DE GARCIA BARRAGAN","SAN MARTIN DE BOLANOS","CANADAS DE OBREGON","SAN JOSE DEL RINCON","VALLE DE CHALCO SOLIDARIDAD","SAN MARTIN DE LAS PIRAMIDES","ZITACUARO","TANHUATO","ARIO","TUMBISCATIO","JUNGAPEO","ACUITZIO","SUSUPUATO","GABRIEL ZAMORA","JUAREZ","HUETAMO","TIQUICHEO DE NICOLAS ROMERO","TLALPUJAHUA","PARACHO","DR. BELISARIO DOMINGUEZ","TLALTIZAPAN DE ZAPATA","DEL NAYAR","SAN MATEO YUCUTINDOO","ROSARIO","ALTZAYANCA","MEDELLIN","NANCHITAL DE LAZARO CARDENAS DEL RIO")
+
+planea$municipio <- plyr::mapvalues(planea$municipio, to=to_conapo, from=from_schools)
+```
+
+Load the CONAPO table
+```{r}
+the_options <- "WHERE \"ANO\" = 2015"
+query <- load_query(con,public,conapo,options=the_options)
+conapo <- query %>% retrieve_result()
+clear_results(con)
+conapo$CLAVE <- conapo$CLAVE %>% str_pad(width=5,pad="0")
+conapo$NOM_ENT %<>% str_replace_all("Oaxaca.*","Oaxaca")
+conapo$MUN <- conapo$MUN %>% iconv(from="UTF-8",to="ASCII//TRANSLIT") %>% toupper() %>% str_replace_all("SAN PEDRO MIXTEPEC.*","SAN PEDRO MIXTEPEC")
+conapo %<>% select(CLAVE,NOM_ENT,MUN,SEXO,POB) %<>% dplyr::group_by(CLAVE,NOM_ENT,MUN) %>% dplyr::summarise(POP=sum(POB))
+```
+
+Load the marginalization table and change the variable names to usable ones.
+```{r}
+the_options <- "WHERE \"YEAR\" = 2015"
+query <- load_query(con,public,marginalization,options=the_options)
+marginacion <- query %>% retrieve_result()
+clear_results(con)
+
+# TODO change this to SQL query
+marginacion %<>% select(-CVE_ENT,-ENT,-MUN,-VP)
+colnames(marginacion) <- c("CLAVE","pop_marg","illiteracy","elementary","no_sewage","no_electricity","no_water","overcrowding","dirt_floor","less_5k","less_2minwage","ovsd","ovsdse","im","gm","ind0a100","lugar","lugarest","YEAR")
+
+# TODO set CLAVE as TEXT in marginalization schema for SQL ingest in pipeline
+marginacion$CLAVE <- as.character(marginacion$CLAVE) %>% str_pad(width=5,pad="0")
+col2num <- colnames(marginacion %>% select(-CLAVE,-gm))
+marginacion[col2num] <- sapply(marginacion[col2num],as.numeric)
+
+marginacion <- marginacion[!is.na(marginacion$gm),]
+```
+
+
+Join the three tables. I should run this in Postgres. *TODO* write SQL statement.
+```{r}
+schools <- conapo %>% right_join(planea,by=c("NOM_ENT"="entidad","MUN"="municipio")) %>% left_join(marginacion, by="CLAVE") %>% ungroup(NOM_ENT)
+schools$gm <- factor(schools$gm,levels=c("Muy bajo","Bajo","Medio","Alto","Muy alto"))
+schools$tipo_escuela <- factor(schools$tipo_escuela,levels=c("General Pública","Técnica Pública","Telesecundaria","Privada","Comunitaria"))
+```
+
+This result is for a table in the document
+```{r}
+marginacion %>% group_by(gm) %>% summarise(n())
+```
+
+How many schools
+```{r}
+length(unique(planea$clave))
+```
+
+
+The number of schools in a municipality.
+```{r}
+schools_by_mun <- planea %>% distinct(ent,municipio,escuela,marginacion) %>% group_by(ent,municipio) %>% summarise(number=n())
+num_schools <- schools_by_mun %>% group_by(number) %>% summarise(num_school = n())
+```
+
+Fit porwer-law to number of schools
+```{r}
+schools_power_law <- lm(log10(num_school) ~ log10(number),num_schools)
+```
+
+
+```{r}
+seq_schools <- seq(min(num_schools),max(num_schools))
+adjusted_power <- 10^schools_power_law$coefficients[1]*seq_schools^schools_power_law$coefficients[2]
+schools_power_law
+```
+
+
+```{r}
+the_p_law <- tibble(number=seq_schools,value=adjusted_power)
+num_schools %<>% left_join(the_p_law,by="number")
+```
+
+
+```{r}
+ggplot(num_schools)+
+  geom_bar(aes(x=number,y=num_school),stat = "identity")+
+  geom_line(aes(x=number,y=value),color="red")+
+  scale_x_continuous(name="Schools")+
+  scale_y_continuous(name = "Municipalities",limits = c(0,250))+
+  ggtitle("Municipalities by number of schools")+
+  th
+
+# This path should point to a place inside the docker container
+ggsave("../../figs/powerlaw_school_mun.png",width = 15,height = 10,units = "cm")
+```
+
+```{r}
+ggplot(num_schools)+
+  geom_point(aes(x=log10(number),y=log10(num_school)))+
+  # geom_smooth(aes(x=log10(number),y=log10(num_school)),method = "glm")+
+  geom_line(aes(x=log10(number),y=log10(value)),color="red")+
+  scale_x_continuous(name="Schools")+
+  scale_y_continuous(name = "Municipalities")+
+  ggtitle("Municipalities by number of schools")+
+  th
+
+ggsave("../../figs/powerlaw_school_mun_log.png",width = 15,height = 10,units = "cm")
+```
+
+
+
+
+
+
+Number of evaluated students in language
+```{r}
+sum(as.numeric(planea$evaluados_len))
+```
+
+Number of evaluated students in mathematics
+```{r}
+sum(as.numeric(planea$evaluados_mat))
+```
+
+
+There's a variable called representativity for both math and language but it's unclear the percentage cut-off, then I will use the schools with above 50% of both tests
+```{r}
+schools[(schools$repre_len == "NO") | (schools$repre_mat == "NO"),]
+```
+
+```{r}
+schools[(schools$porc_len > 50 & schools$porc_mat > 50),]
+```
+
+```{r}
+schools[!(schools$porc_len > 50 & schools$porc_mat > 50),]
+```
+
+```{r}
+schools[(schools$repre_len == "SÍ") & (schools$repre_mat == "SÍ"),]
+schools
+```
+
+
+
+
+```{r}
+schools <- schools[(schools$porc_len > 50 & schools$porc_mat > 50),]
+mun_schools <- schools %>%
+  select(CLAVE,escuela,POP,marginacion,gm,elementary,illiteracy) %>%
+  unique() %>% dplyr::group_by(CLAVE) %>%
+  dplyr::summarise(num_school = n(),POB=unique(POP),elementary=unique(elementary),illiteracy=unique(illiteracy),gm=unique(gm)) %>%
+  mutate(spc = num_school/(POB/100000))
+
+```
+
+```{r}
+mar_scores <- schools %>% select(CLAVE,POP,illiteracy,elementary,I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat)
+mar_scores %<>% group_by(CLAVE) %>% dplyr::summarise(num_school=n(),POP=unique(POP),illiteracy=unique(illiteracy),elementary=unique(elementary),I_len = mean(I_porc_len),II_len = mean(II_porc_len),III_len = mean(III_porc_len),IV_len = mean(IV_porc_len),
+                                                    I_mat = mean(I_porc_mat),II_mat = mean(II_porc_mat),III_mat = mean(III_porc_mat),IV_mat = mean(IV_porc_mat))
+```
+
+
+```{r}
+ggplot(mun_schools)+
+  geom_histogram(aes(spc),binwidth = 10,fill="#848256")+
+  scale_x_continuous(name="Schools per 100,000 pop")+
+  scale_y_continuous(name="Municipalities")+
+  th
+```
+
+
+
+Translate some variables to english. There are some with peculiar name that shouldn't be translated.
+```{r}
+schools_tidy <- schools %>% select(tipo_escuela,gm,I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat)
+schools_tidy %<>% pivot_longer(c(I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat))
+
+unique(schools$tipo_escuela)
+englishType <- c("Comunitaria","Public G.", "Private", "Public T.", "Telesecundaria")
+spanishType <- c("Comunitaria","General Pública", "Privada", "Técnica Pública", "Telesecundaria")
+
+englishM <- c("Very Low","Low", "Medium", "High", "Very High")
+spanishM <- c("Muy bajo","Bajo", "Medio", "Alto", "Muy alto")
+
+results <- c("Language I", "Language II", "Language III", "Language IV", "Math I", "Math II", "Math III", "Math IV")
+resultados <- c("I_porc_len","II_porc_len","III_porc_len","IV_porc_len","I_porc_mat","II_porc_mat","III_porc_mat","IV_porc_mat")
+
+schools_tidy$tipo_escuela <- plyr::mapvalues(schools_tidy$tipo_escuela, to=englishType, from=spanishType)
+schools_tidy$name <- plyr::mapvalues(schools_tidy$name, to=results, from=resultados)
+schools_tidy$gm <- plyr::mapvalues(schools_tidy$gm, to=englishM, from=spanishM)
+
+# schools_tidy$tipo_escuela <- factor(schools_tidy$tipo_escuela,levels=c("General Pública","Técnica Pública","Telesecundatia","Privada","Comunitaria"))
+```
+
+
+
+Define the colors
+```{r}
+altoc <- "#e3b23c"
+bajoc <- "#725752"
+medioc <- "#fe64a3"
+maltoc <- "#78bc61"
+mbajoc <- "#4f359b"
+```
+
+```{r}
+mt <- ggplot(schools_tidy)+
+  geom_boxplot(aes(tipo_escuela,value,fill=gm),alpha=0.8)+
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  scale_x_discrete(name="School Type")+#, breaks = c("a","b","c","d","e"))+
+  # scale_y_continuous(name = "Risk Aversion Measure", breaks = c(0,0.2,0.4,0.6,0.8,1), limits = c(-0.1,1.1))+
+  scale_y_continuous(name = "Student percentage")+
+  # theme_classic()+
+  ggtitle("School-wise student percentage by achievement level")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+mt + facet_grid(vars(name))+
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+ggsave("../../figs/achievement_levels.png",height = 20, width = 40, units = "cm")
+```
+
+Define plot colors
+```{r}
+comc <- "#efecca"
+privc <- "#db2b39"
+pubgc <- "#f7ff58"
+pubtc <- "#ff934f"
+telec <- "#29335c"
+```
+
+```{r}
+mt <- ggplot(schools_tidy)+
+  geom_boxplot(aes(gm,value,fill=tipo_escuela),alpha=0.8)+
+  scale_fill_manual(name = "School Type", values = c("Comunitaria" = comc, "Private" = privc, "Public G." = pubgc, "Public T." = pubtc, "Telesecundaria" = telec))+
+                      # labels = c("Low", "Very Low", "Medium", "High", "Very High"))+
+  scale_x_discrete(name="Marginalization")+#, breaks = c("a","b","c","d","e"))+
+  scale_y_continuous(name = "Student percentage")+
+  ggtitle("School-wise student percentage by achievement level")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+mt + facet_grid(vars(name)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+ggsave("../../figs/achievement_levels_by_marginalization.png",height = 20, width = 40, units = "cm")
+```
+
+
+
+
+
+```{r}
+schools <- conapo %>% right_join(planea,by=c("NOM_ENT"="entidad","MUN"="municipio")) %>% left_join(marginacion, by="CLAVE")
+unique(schools$tipo_escuela)
+schools$gm <- factor(schools$gm,levels=c("Muy bajo","Bajo","Medio","Alto","Muy alto"))
+ggplot(schools)+
+  geom_boxplot(aes(tipo_escuela,IV_porc_mat,fill=gm),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+# ggsave("../../figs/achievement_levels_by_marginalization.png",height = 20, width = 40, units = "cm")
+```
+
+
+schools with 100% in IV level for mathematics
+```{r}
+val100 <- mar_scores[order(mar_scores$IV_mat,decreasing = T),][1:4,]$CLAVE
+schools[schools$CLAVE %in% val100,]
+```
+
+
+Load the indigenous population and joint information with the test.
+```{r}
+the_options <- "WHERE \"MPO\" != '000'"
+query <- load_query(con,public,indigenous_language,options = the_options)
+indig <- query %>% retrieve_result()
+clear_results(con)
+
+indig %<>% mutate(CLAVE=paste0(ENT,MPO),ph_analf = hANALFA/IPOB_INDI, pm_analf = mANALFA/IPOB_INDI)
+mar_scores %<>% left_join(indig,by="CLAVE") %<>% mutate(prop_indi = IPOB_INDI/POP)
+mar_scores %<>% left_join(schools %>% select(CLAVE,gm)) %>% unique()
+mar_scores %<>% mutate(p_len = (IPhli/POP))
+```
+
+
+
+Plot the percentage of indigenous population by level of marginalization.
+```{r}
+englishType <- c("Comunitaria","Public G.", "Private", "Public T.", "Telesecundaria")
+spanishType <- c("Comunitaria","General Pública", "Privada", "Técnica Pública", "Telesecundaria")
+
+mar_scores$gm <- plyr::mapvalues(mar_scores$gm, to=englishM, from=spanishM)
+
+mar_scores <- mar_scores[!is.na(mar_scores$gm),]
+
+ggplot(mar_scores)+
+  geom_boxplot(aes(gm,prop_indi,fill=gm),alpha=0.8)+
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  scale_x_discrete(name="Marginalization")+#, breaks = c("a","b","c","d","e"))+
+  scale_y_continuous(name = "Percentage of indigenous population",limits = c(0,1))+
+  ggtitle("Indigenous population by marginalization")+
+    th
+
+ggsave("../../figs/indi_vs_marg.png",height = 20, width = 40, units = "cm")
+```
+
+## Some variables that won't make it into the document
+
+```{r}
+ggplot(mar_scores)+
+  geom_point(aes((prop_indi),(illiteracy/100)))+
+  geom_smooth(aes((prop_indi),(illiteracy/100)),method = "lm",color="red")+
+  scale_y_continuous(name="Illiteracy")+
+  scale_x_continuous(name="Indigenous Population")+
+  th
+```
+
+As expected the ratio of indigenous population in a municipality correlates perfectly with the percentage of inhabitants that speak a indigenous language.
+```{r}
+ggplot(mar_scores)+
+  geom_point(aes((prop_indi),(p_len)))+
+  geom_smooth(aes((prop_indi),(p_len)),method = "lm",color="red")+
+  scale_y_log10(name="Indigenous Language")+
+  scale_x_log10(name="Indigenous Population")+
+  th
+```
+
+The more indigenous more illiteracy.
+
+```{r}
+ggplot(mar_scores)+
+  geom_point(aes((p_len),(illiteracy/100)))+
+  geom_smooth(aes((p_len),(illiteracy/100)),method = "lm",color="red")+
+  scale_y_continuous(name="Illiteracy")+
+  scale_x_continuous(name="Indigenous Language")+
+  th
+```
+
+
+
+The percentage of indigenous population correlates possitevily with the percentage of level 1 achievement.
+
+```{r}
+lm(I_len/100 ~ p_len, mar_scores)
+```
+
+```{r}
+ggplot(mar_scores)+
+  geom_point(aes((p_len),I_len/100))+
+  geom_smooth(aes((p_len),I_len/100),method = "lm")+
+  scale_x_continuous(name = "Indigenous language speakers")+
+  scale_y_continuous(name = "Language I achievement")+
+  th
+
+ggsave("../../figs/ILan_vs_indiLang.png",height = 20, width = 20, units = "cm")
+```
+
+
+While for the level IV it has a negative correlation
+```{r}
+lm(IV_len/100 ~ p_len, mar_scores)
+```
+
+```{r}
+ggplot(mar_scores)+
+  geom_point(aes((p_len),IV_len/100))+
+  geom_smooth(aes((p_len),IV_len/100),method = "lm")+
+  scale_x_continuous(name = "Indigenous language speakers")+
+  scale_y_continuous(name = "Language IV achievement")+
+  th
+ggsave("../../figs/IVLan_vs_indiLang.png",height = 20, width = 20, units = "cm")
+```
+
+
+
+
+```{r}
+# mar_tidy <- mar_scores %>% select(tipo_escuela,gm,I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat)
+mar_tidy <- mar_scores %>% pivot_longer(c(I_len,II_len,III_len,IV_len,I_mat,II_mat,III_mat,IV_mat)) %>% unique()
+```
+
+
+How does language and math level I correlate in a highly marginalized municipality?
+```{r}
+ggplot(mar_scores[mar_scores$gm == "Very High",])+
+  coord_fixed()+
+  geom_abline()+
+  scale_y_continuous(limits = c(0,100))+
+  scale_x_continuous(limits = c(0,100))+
+  geom_point(aes(I_len,I_mat))+
+  th
+```
+  
+  
+what about a very low marginalized area?
+```{r}
+ggplot(mar_scores[mar_scores$gm == "Very Low",])+
+  coord_fixed()+
+  geom_abline()+
+  scale_y_continuous(limits = c(0,100))+
+  scale_x_continuous(limits = c(0,100))+
+  geom_point(aes(I_len,I_mat))+
+  th
+```
+
+```{r}
+mt <- ggplot(mar_scores)+
+  geom_point(aes(log10(I_len),log10(I_mat),color=gm))+
+  scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  coord_fixed()+
+  geom_abline()+
+  scale_x_log10(name = "percentage language")+#,limits = c(0,100))+
+  scale_y_log10(name = "percentage mathematics")+#,limits = c(0,100))+
+  ggtitle("Achievement Level I by marginalization")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+mt + facet_grid(cols=vars(gm)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+ggsave("../../figs/math_vs_language_I_log.png",height = 20, width = 40, units = "cm")
+```
+
+
+```{r}
+ggplot(mar_scores)+
+  geom_point(aes(log10(IV_len),log10(IV_mat)))+
+  coord_fixed()+
+  geom_abline()+
+  scale_x_continuous(name = "percentage language")+#,limits = c(0,100))+
+  scale_y_continuous(name = "percentage mathematics")+#,limits = c(0,100))+
+  ggtitle("Achievement Level IV")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+
+ggsave("../../figs/math_vs_language_VI_all_log.png",height = 20, width = 40, units = "cm")
+# ggsave("~/Documents/UVM/courses/DS2/assignments/HW8/math_vs_language_IV_all.png",height = 20, width = 20, units = "cm")
+```
+
+
+
+
+```{r}
+mt <- ggplot(mar_scores)+
+  geom_point(aes(log10(IV_len),log10(IV_mat),color=gm))+
+  scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  coord_fixed()+
+  geom_abline()+
+  scale_x_log10(name = "percentage language")+#,limits = c(0,100))+
+  scale_y_log10(name = "percentage mathematics")+#,limits = c(0,100))+
+  ggtitle("Achievement Level IV by marginalization")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+mt + facet_grid(cols=vars(gm)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+ggsave("../../figs/math_vs_language_IV_log.png",height = 20, width = 40, units = "cm")
+```
+
+
+```{r}
+mt <- ggplot(mar_scores)+
+  geom_point(aes((IV_len),(I_mat),color=gm))+
+  scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  coord_fixed()+
+  geom_abline()+
+  # scale_x_continuous(name = "percentage language",limits = c(0,100))+
+  # scale_y_continuous(name = "percentage mathematics",limits = c(0,100))+
+  ggtitle("Achievement Level IV by marginalization")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+mt + facet_grid(cols=vars(gm)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+# ggsave("~/Documents/UVM/courses/DS2/assignments/HW6/math_vs_language_IV.png",height = 20, width = 40, units = "cm")
+```
+
+```{r}
+mt <- ggplot(mar_scores)+
+  geom_point(aes((prop_indi),(IV_len),color=gm),alpha=0.6)+
+  # geom_density(aes(pm_analf),)+
+  # geom_point(aes(ph_analf,prop_indi,color=gm),alpha=0.4)+
+  scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  # coord_fixed()+
+  # geom_abline()+
+  # scale_x_continuous(name = "percentage language",limits = c(0,1))+
+  # scale_y_continuous(name = "percentage mathematics",limits = c(0,100))+
+  scale_x_log10()+
+  scale_y_log10()+
+  ggtitle("Achievement Level IV by marginalization")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+mt + facet_grid(cols=vars(gm)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+# ggsave("~/Documents/UVM/courses/DS2/assignments/HW6/math_vs_language_IV.png",height = 20, width = 40, units = "cm")
+```
+
+# Maps and things
+
+
+```{r,echo=FALSE,warning=FALSE,include=FALSE}
+paquetines <- c("ggplot2","plotly","tibble","tidyr","magrittr","dplyr","readr","ggpmisc","sf",
+                "reshape2","rangeMapper","RColorBrewer","stringr","quadmesh","rgl","psych","purrr",
+                "rgdal","deldir","ggthemes","broom","leaflet","htmltools","spatstat","geosphere") #"sf"
+no_instalados <- paquetines[!(paquetines %in% installed.packages()[,"Package"])]
+if(length(no_instalados)) install.packages(no_instalados)
+lapply(paquetines, library, character.only = TRUE)
+```
+
+I defined a function to get the geometries in an easy way. **TODO**: update _fortify_ with _broom_
+
+
+```{r,warning=FALSE}
+indig_pop <- indig %>% left_join(conapo,by="CLAVE")
+indig_pop %<>% mutate(p_indig = IPOB_INDI/POP)
+municipios_pop <- geom_muni %>% left_join(indig_pop, by = c("CVEGEO"="CLAVE"))
+geom_muni$CVEGEO %>% unique() %>% length()
+```
+
+We have 7 municipalities without indigenous information, I don't know if it is because they were instituted between 2015 and 2018, which is the last CONAPO available data and the geometry data that I have. (2456 to 2463, as in 2020 there are 2464)
+```{r,warning=FALSE}
+ggplot()+
+  geom_polygon(data = municipios_pop,
+               aes(long,lat,label=CVEGEO,group=group,
+                   fill=p_indig*100),color="grey",size=0.1)+
+  coord_map(projection = "mercator")+
+  scale_fill_continuous(name="Percentage",low="white", high="#0f5a5e",
+                       guide="colorbar",limits=c(0,100))+
+  labs(title="Indigenous Population")+
+  theme(#panel.grid.major.y = element_line(color = "gray"),
+        panel.grid.major.y = element_blank(),
+        text = element_text(color = "gray20"),
+        panel.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.box = "horizontal",
+        legend.text = element_text(size = 10),
+        plot.caption = element_text(hjust=0),
+        plot.title = element_text(size = 16, face = "bold",hjust=0.39))
+
+ggsave("../../figs/map_indigenous.png",height = 30, width = 30, units = "cm")
+```
+
+
+```{r,warning=FALSE}
+municipios_nal <- geom_muni %>% left_join(mar_scores, by = c("CVEGEO"="CLAVE"))
+```
+
+
+A tilt in the map allows a better stacking
+```{r,fig.width=6,fig.height=6}
+# Shear/scale matrix [[2,1],[0,1]] obtained by some trial and error:
+sm <- matrix(c(1,-0.3,0,1),2,2)
+# Get transformed coordinates:
+xy <- as.matrix(municipios_nal[,c("long","lat")]) %*% sm
+# Add xy as extra columns in fortified data:
+municipios_nal$x <- xy[,1]; municipios_nal$y = xy[,2]
+```
+
+```{r}
+min(municipios_nal$x)
+max(municipios_nal$x)
+
+max(municipios_nal$y) - min(municipios_nal$y)
+min(municipios_nal$y)
+mean(municipios_nal$y)
+```
+
+Stacked map for the 4 levels of math
+```{r,fig.width=6,fig.height=6}
+p <- ggplot() +
+  geom_polygon(data = municipios_nal, aes(x, y,label=CVEGEO, group=group,fill=(I_mat)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y),color="gray35",label="Level I")+
+  geom_polygon(data = municipios_nal, aes(x, y-14,label=CVEGEO, group=group,fill=(II_mat)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y-14),color="gray35",label="Level II")+
+  geom_polygon(data = municipios_nal, aes(x, y-28,label=CVEGEO, group=group,fill=(III_mat)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y-28),color="gray35",label="Level III")+
+  geom_polygon(data = municipios_nal, aes(x, y-42,label=CVEGEO, group=group,fill=(IV_mat)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y-42),color="gray35",label="Level IV")+
+  labs(title="Mathematics")+
+  scale_fill_continuous(name = "Mean percentage",low="white", high="#5A0D35", guide="colorbar")+#,na.value="#f2f2f2")+
+  coord_map(projection = "mercator")+
+  theme(#panel.grid.major.y = element_line(color = "gray"),
+        panel.grid.major.y = element_blank(),
+        text = element_text(color = "gray20"),
+        panel.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        # legend.box = "horizontal",
+        legend.text = element_text(size = 10),
+        plot.caption = element_text(hjust=0),
+        plot.title = element_text(size = 16, face = "bold",hjust=0.39))
+
+ggsave("../../figs/stacked_math.png",p,height = 30, width = 30, units = "cm")
+```
+
+and language
+```{r,fig.width=6,fig.height=6}
+p <- ggplot() +
+  geom_polygon(data = municipios_nal, aes(x, y,label=CVEGEO, group=group,fill=(I_len)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y),color="gray35",label="Level I")+
+  geom_polygon(data = municipios_nal, aes(x, y-14,label=CVEGEO, group=group,fill=(II_len)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y-14),color="gray35",label="Level II")+
+  geom_polygon(data = municipios_nal, aes(x, y-28,label=CVEGEO, group=group,fill=(III_len)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y-28),color="gray35",label="Level III")+
+  geom_polygon(data = municipios_nal, aes(x, y-42,label=CVEGEO, group=group,fill=(IV_len)),color="white",size=0.01)+
+  annotate("text",x=min(municipios_nal$x)+10,y=mean(municipios_nal$y-42),color="gray35",label="Level IV")+
+  labs(title="Language")+
+  scale_fill_continuous(name = "Mean percentage",low="white", high="#5a5a0d", guide="colorbar")+#,na.value="#f2f2f2")+
+  coord_map(projection = "mercator")+
+  theme(#panel.grid.major.y = element_line(color = "gray"),
+        panel.grid.major.y = element_blank(),
+        text = element_text(color = "gray20"),
+        panel.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        # legend.box = "horizontal",
+        legend.text = element_text(size = 10),
+        plot.caption = element_text(hjust=0),
+        plot.title = element_text(size = 16, face = "bold",hjust=0.39))
+
+ggsave("../../figs/stacked_language.png",p,height = 30, width = 30, units = "cm")
+```
+
+I want to compute the density of schools by square kilometer
+```{r}
+query <- load_table(con,public,geom_muni)
+muni_df <- query %>% retrieve_result()
+clear_results(con)
+```
+
+Build the polygons and compute the area in Km^2
+```{r,warning=FALSE}
+polman <- lapply(muni_df$WKT,rgeos::readWKT)
+rgeos::gUnion(polman[[1]],polman[[2]])
+length(polman)
+
+the_areas <- sapply(polman,geosphere::areaPolygon)
+areas_df <- tibble(CVEGEO=muni_df$CVEGEO,area=the_areas/1000000)
+```
+
+Now we need the number of Schools but not from the test, we'll use the data from Consejo Nacional de Fomento Educativo (CONAFE) through the Censo de Escuelas, Maestros y Alumnos de Educación Básica y Especial (CEMABE)
+Nop, now I now that CONAFE is a program  to contribute children in highly marginalized areas to conclude their basic comunitary education, with economical support to educational figures and scholarly supplies to students.
+It would be interesting to analize this into deep!!!
+
+This is the number of schools in the planea set
+```{r,warning=FALSE}
+unique(planea$clave) %>% length()
+```
+
+```{r}
+schools_mun <- schools %>% group_by(CLAVE) %>% summarise(num=n())
+areas_df %<>% left_join(schools_mun,by=c("CVEGEO"="CLAVE"))
+areas_df %<>% mutate(density = num/area)
+```
+
+
+The density is log-normal
+As well as the test results. Should consider this when doing regressions.
+```{r,warning=FALSE}
+ggplot(areas_df)+
+  geom_histogram(aes(log10(density)))+
+  th
+```
+
+```{r,warning=FALSE}
+geom_mun_school <- geom_muni %>% left_join(areas_df, by = c("CVEGEO"))
+```
+
+```{r,warning=FALSE}
+library(latex2exp)
+ggplot()+
+  geom_polygon(data = geom_mun_school,
+               aes(long,lat,label=CVEGEO,group=group,
+                   fill=(density)),color="grey",size=0.01)+
+  coord_map(projection = "mercator")+
+  # scale_fill_continuous(name="Percentage",low="white", high="#4c1262", guide="colorbar")+#,limits=c(0,100))+
+  scale_fill_gradient(trans="log10",name="Density",low="white", high="#4c1262", guide="colorbar",labels=c(0,0.5,1,1.5,2,2.5))+#,limits=c(0,100))+
+  labs(title=TeX("Schools by $Km^2$"))+
+  theme(#panel.grid.major.y = element_line(color = "gray"),
+        panel.grid.major.y = element_blank(),
+        text = element_text(color = "gray20"),
+        panel.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.box = "horizontal",
+        legend.text = element_text(size = 10),
+        plot.caption = element_text(hjust=0),
+        plot.title = element_text(size = 16, face = "bold",hjust=0.39))
+
+ggsave("../../figs/map_school_density.png",p,height = 30, width = 30, units = "cm")
+```
+
+
+I think I haven't written the ingestion code for the schools into the sql database. *TODO*
+Although I'm not using it.
+
+```{r,warning=FALSE}
+conafe <- read_delim("/home/ollin/Documents/UVM/courses/DS2/project/planea/data/clean/tr_conafe.csv",delim="|")
+conafe %<>% mutate(CVEGEO=paste0(ENT,MUN))
+conafe %>% group_by(CVEGEO) %>% summarise(num = n())
+```
+
+
+
+# Maps are cool but we need other stuff, let's make ridges for achievement
+
+```{r}
+library(ggridges)
+```
+
+```{r}
+mar_tidy <- mar_scores %>% pivot_longer(c(I_len,II_len,III_len,IV_len,I_mat,II_mat,III_mat,IV_mat)) %>% unique()
+```
+
+# First for all
+
+```{r}
+ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name)) +
+  scale_x_continuous(limits = c(0,100))+
+  geom_density_ridges()
+```
+
+```{r}
+ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name, height = stat(density))) +
+  geom_density_ridges(stat = "density")+
+  th
+```
+
+```{r}
+ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name)) +
+  scale_x_continuous(limits = c(0,100))+
+  geom_density_ridges()
+```
+
+
+```{r}
+ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name, height = stat(density))) +
+  geom_density_ridges(stat = "density")+
+  th
+```
+
+
+
+Then the facets by marginalization level
+
+```{r}
+ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  geom_density_ridges()+
+  scale_x_continuous(limits = c(0,100))+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")+
+  facet_grid(~gm)+
+  theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+
+
+```{r}
+ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6, height = stat(density))) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  geom_density_ridges(stat = "density")+
+  scale_x_log10()+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")+
+  facet_grid(~gm)+
+  theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+
+```{r}
+ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+    geom_density_ridges()+
+  scale_x_continuous(limits = c(0,100))+
+    th+
+    theme(
+      axis.text.x = element_text(angle = 0),
+      panel.grid.minor = element_blank(),
+      legend.position = "none")+
+    facet_grid(~gm)+
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+```{r}
+ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6, height = stat(density))) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+    geom_density_ridges(stat = "density")+
+  scale_x_log10()+
+    th+
+    theme(
+      axis.text.x = element_text(angle = 0),
+      panel.grid.minor = element_blank(),
+      legend.position = "none")+
+    facet_grid(~gm)+
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+
+```{r}
+ggplot(mar_tidy[!grepl("II_",mar_tidy$name) & grepl("I_",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+    geom_density_ridges()+
+  scale_x_continuous(limits = c(0,100))+
+    th+
+    theme(
+      axis.text.x = element_text(angle = 0),
+      panel.grid.minor = element_blank(),
+      legend.position = "none")+
+    facet_grid(~gm)+
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+```{r}
+ggplot(mar_tidy[!grepl("II_",mar_tidy$name) & grepl("I_",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6, height = stat(density))) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+    geom_density_ridges(stat = "density")+
+  scale_x_log10()+
+    th+
+    theme(
+      axis.text.x = element_text(angle = 0),
+      panel.grid.minor = element_blank(),
+      legend.position = "none")+
+    facet_grid(~gm)+
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+
+
+```{r}
+ggplot(mar_tidy[grepl("IV_",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+    geom_density_ridges()+
+  scale_x_continuous(limits = c(0,100))+
+    th+
+    theme(
+      axis.text.x = element_text(angle = 0),
+      panel.grid.minor = element_blank(),
+      legend.position = "none")+
+    facet_grid(~gm)+
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+```{r}
+ggplot(mar_tidy[grepl("IV_",mar_tidy$name),], aes(x = (value), y = name,fill=gm,alpha=0.6, height = stat(density))) +
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+    geom_density_ridges(stat = "density")+
+  scale_x_log10()+
+    th+
+    theme(
+      axis.text.x = element_text(angle = 0),
+      panel.grid.minor = element_blank(),
+      legend.position = "none")+
+    facet_grid(~gm)+
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
+
+
+
+# Let's check the Bayesian networks
+# Puerto Morelos became municipality in 2011
+
+```{r}
+encode_ordinal <- function(x, order = unique(x)) {
+  x <- as.numeric(factor(x, levels = order, exclude = NULL))
+  x
+}
+```
+
+
+```{r}
+schools <- schools %>% select(-ovsd,-ovsdse,-ind0a100)
+schools <- schools[complete.cases(schools),]
+areas_df <- areas_df %>% mutate(CLAVE=CVEGEO) %>% select(-CVEGEO)
+indig
+```
+
+
+```{r}
+for_bn <- schools %>% left_join(indig %>% select(CLAVE,IPOB_INDI,IPhli))
+for_bn <- for_bn %>% mutate(p_indig = IPOB_INDI/pop_marg,lang_indig=IPhli/IPOB_INDI)
+for_bn %<>% left_join(areas_df,by="CLAVE")
+
+for_bn[!complete.cases(for_bn),]$IPOB_INDI <- 0
+for_bn[!complete.cases(for_bn),]$p_indig <- 0
+databn <- for_bn %>% ungroup(CLAVE,NOM_ENT) %>% select(I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat,turno,gm,tipo_escuela,illiteracy,elementary,no_sewage,no_electricity,no_water,overcrowding,dirt_floor,less_5k,less_2minwage,im,lugar,lugarest,IPOB_INDI,p_indig,area,num,density,lang_indig)
+databn
+
+# I should automate this
+databn$turno <- encode_ordinal(databn$turno)
+databn$gm <- encode_ordinal(databn$gm)
+databn$tipo_escuela <- encode_ordinal(databn$tipo_escuela)
+
+# databn$turno <- as.double(databn$turno)
+# databn$gm <- as.double(databn$gm)
+# databn$num <- as.double(databn$num)
+# databn$tipo_escuela <- as.double(databn$tipo_escuela)
+
+databn2 <- databn
+
+databn$I_porc_len <- log10(databn$I_porc_len)
+databn$II_porc_len <- log10(databn$II_porc_len)
+databn$III_porc_len <- log10(databn$III_porc_len)
+databn$IV_porc_len <- log10(databn$IV_porc_len)
+
+databn$I_porc_mat <- log10(databn$I_porc_mat)
+databn$II_porc_mat <- log10(databn$II_porc_mat)
+databn$III_porc_mat <- log10(databn$III_porc_mat)
+databn$IV_porc_mat <- log10(databn$IV_porc_mat)
+
+databn$density <- log10(databn$density)
+databn$p_indig <- log10(databn$p_indig)
+databn$lang_indig <- log10(databn$lang_indig)
+
+databn_finite <- databn[apply(databn, 1, function(row) all(is.finite(row))),]
+databn_finite <- databn[apply(databn %>% select(-turno,-gm,-num,-tipo_escuela), 1, function(row) all(is.finite(row))),]
+databn_finite %<>% select(-im,-lugar,-lugarest,-IPOB_INDI,-area,-num)
+```
+
+
+```{r,echo=FALSE,warning=FALSE,include=FALSE}
+paquetines <- c("mlbench","caret","party")
+no_instalados <- paquetines[!(paquetines %in% installed.packages()[,"Package"])]
+if(length(no_instalados)) install.packages(no_instalados)
+lapply(paquetines, library, character.only = TRUE)
+```
+
+Delete the highly correlated variables
+```{r}
+set.seed(42)
+corrM <- cor(databn_finite[,c(9:22)])
+highlyCorrelated <- findCorrelation(corrM, cutoff=0.50)
+colnames(databn_finite[,c(9:22)])[highlyCorrelated]
+databn_finite %<>% select(-illiteracy,-elementary,-less_2minwage,-dirt_floor,-less_5k)
+# databn_finite %<>% select(-gm)
+```
+
+
+
+# Variable selection
+```{r}
+# control <- trainControl(method="cv", number=10)
+# model <- caret::train(I_porc_len~., data=databn_finite, method="cforest", preProcess="scale", trControl=control)
+# # estimate variable importance
+# importance <- varImp(model, scale=FALSE)
+# # summarize importance
+# print(importance)
+# # plot importance
+# plot(importance)
+```
+
+
+
+```{r}
+# set.seed(42)
+# databn_finite2 <- as.data.frame(databn_finite)
+# #Controlling the feature selection, using default functions, with 10 folds cross validation
+# control <- rfeControl(functions=rfFuncs, method="cv", number=10)
+# # run the RFE algorithm
+# # using recursive feature elimination or backwards selection
+# # let's check first if it works the same for each level and test
+# results <- rfe(x=databn_finite2[,c(1,10:19)], y=databn_finite2[,2], rfeControl=control)
+# # results <- rfe(databn[,c(1,10:27)], databn[,n], sizes=c(1:18), rfeControl=control)
+# # summarize the results
+# print(results)
+# # list the chosen features
+# predictors(results)
+# # plot the results
+# plot(results, type=c("g", "o"))
+```
+
+
+
+
+```{r}
+for (i in 1:8){
+  bnf <- bnlearn::h2pc(databn_finite[,c(i,9:19)])
+  png(paste0("/figs/graph_",i,".png"))
+  plot(graphviz.plot(bnf, shape = "ellipse"))
+  dev.off()
+  str.diff <- bnlearn::boot.strength(databn_finite[,c(i,9:19)],R=20,algorithm="h2pc")
+  avg.diff <- averaged.network(str.diff)#,threshold = 0.7)
+  png(paste0("/figs/graph_",i,"_boots.png"))
+  plot(graphviz.plot(avg.diff, shape = "ellipse"))
+  dev.off()
+}
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+graphviz.plot(bnf, shape = "ellipse")
+```
+
+
+
+
+```{r}
+graphviz.plot(bnf, shape = "ellipse")
+```
+
+```{r}
+graphviz.plot(bnaracne, shape = "ellipse")
+```
+
+
+
+
+
+
+

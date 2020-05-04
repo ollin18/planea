@@ -160,3 +160,4 @@ data/clean/tr_inmuebles.sql
 *.xlsx#
 
 data/clean/planea.sql
+figs
