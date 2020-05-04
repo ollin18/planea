@@ -319,6 +319,11 @@ schools_by_mun <- planea %>% distinct(ent,municipio,escuela,marginacion) %>% gro
 num_schools <- schools_by_mun %>% group_by(number) %>% summarise(num_school = n())
 ```
 
+```{r}
+schools$CLAVE %>% unique() %>% length()
+conapo$CLAVE %>% unique() %>% length()
+```
+
 Fit porwer-law to number of schools
 ```{r}
 schools_power_law <- lm(log10(num_school) ~ log10(number),num_schools)
@@ -692,6 +697,10 @@ mt + facet_grid(cols=vars(gm)) +
 ggsave("../../figs/math_vs_language_I_log.png",height = 20, width = 40, units = "cm")
 ```
 
+```{r}
+lm((I_mat) ~ (I_len),mar_scores[mar_scores$gm == "Very Low",])
+lm((I_mat) ~ (I_len),mar_scores[mar_scores$gm == "Very High",])
+```
 
 ```{r}
 ggplot(mar_scores)+
@@ -736,6 +745,14 @@ mt + facet_grid(cols=vars(gm)) +
 
 ggsave("../../figs/math_vs_language_IV_log.png",height = 20, width = 40, units = "cm")
 ```
+
+
+```{r}
+lm((IV_mat) ~ (IV_len),mar_scores[mar_scores$gm == "Very Low",])
+lm((IV_mat) ~ (IV_len),mar_scores[mar_scores$gm == "Very High",])
+```
+
+
 
 
 ```{r}
@@ -995,7 +1012,7 @@ ggplot()+
         plot.caption = element_text(hjust=0),
         plot.title = element_text(size = 16, face = "bold",hjust=0.39))
 
-ggsave("../../figs/map_school_density.png",p,height = 30, width = 30, units = "cm")
+ggsave("../../figs/map_school_density.png",height = 30, width = 30, units = "cm")
 ```
 
 
@@ -1023,48 +1040,122 @@ mar_tidy <- mar_scores %>% pivot_longer(c(I_len,II_len,III_len,IV_len,I_mat,II_m
 # First for all
 
 ```{r}
-ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name)) +
-  scale_x_continuous(limits = c(0,100))+
-  geom_density_ridges()
+ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name, height = stat(density))) +
+  geom_density_ridges(stat = "density")+
+  scale_x_continuous(name="Percentage")+
+  scale_y_discrete(name="Level")+
+  th
+ggsave("../../figs/ridges_len.png",height = 30, width = 30, units = "cm")
 ```
 
 ```{r}
 ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name, height = stat(density))) +
   geom_density_ridges(stat = "density")+
+  scale_x_log10(name="Percentage")+
+  scale_y_discrete(name="Level")+
   th
+ggsave("../../figs/ridges_math_log.png",height = 30, width = 30, units = "cm")
 ```
 
-```{r}
-ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name)) +
-  scale_x_continuous(limits = c(0,100))+
-  geom_density_ridges()
+We conducted an Anderson-Darling test to assess the normality of distributions along achievement levels
+
+```{r,echo=FALSE,warning=FALSE,include=FALSE}
+# paquetines <- c("stringi","reshape2","plyr","dplyr","tidyr","sets","plotly","readr","nortest",
+#                 "ggplot2","lubridate","e1071","useful","magrittr","gower","cluster","equivalence",
+#                 "factoextra","NbClust","readr","DescTools","gridExtra","egg")
+# no_instalados <- paquetines[!(paquetines %in% installed.packages()[,"Package"])]
+# if(length(no_instalados)) install.packages(no_instalados)
+# lapply(paquetines, library, character.only = TRUE)
 ```
+
+compute how likely are them to be drawned by a normal distribution
+```{r,echo=FALSE,warning=FALSE,include=T}
+Data <- mar_scores %>% dplyr::select(I_mat,II_mat,III_mat,IV_mat)
+Data %<>% log10()
+Data <- Data[apply(Data, 1, function(row) all(is.finite(row))),]
+Datas <- Data %>% sample_n(1500,replace = F)
+sapply(Datas, function(x) shapiro.test(as.numeric(x)) )
+```
+This means that our values are not normal
+
+
+compute how likely are them to be drawned by a the same distribution
+
+
+```{r}
+combos <- combn(4,2)
+plyr::adply(combos, 2, function(x) {
+  test <- t.test(Datas[, as.numeric(x[1])], Data[, as.numeric(x[2])],alternative = "t")
+
+  out <- data.frame("var1" = colnames(Data)[x[1]]
+                    , "var2" = colnames(Data[x[2]])
+                    , "t.value" = sprintf("%.5f", test$statistic)
+                    ,  "df"= test$parameter
+                    ,  "p.value" = test$p.value#sprintf("%.5f", test$p.value)
+                    )
+  return(out)
+
+})
+# mar_scores %>%
+#   dplyr::select(I_len,II_len,III_len,IV_len) %>% 
+#   dplyr::select_if(is.numeric) %>% 
+#   purrr::map_df(~ broom::tidy(t.test(. ~ grp)), .id = 'var')
+```
+
+
+
 
 
 ```{r}
 ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name, height = stat(density))) +
   geom_density_ridges(stat = "density")+
+  scale_x_log10(name="Percentage")+
+  scale_y_discrete(name="Level")+
   th
+
+ggsave("../../figs/ridges_language_log.png",height = 30, width = 30, units = "cm")
 ```
+
+compute how likely are them to be have the same mean
+```{r,echo=FALSE,warning=FALSE,include=T}
+Data <- mar_scores %>% dplyr::select(I_mat,II_mat,III_mat,IV_mat)
+Data %<>% log10()
+Data <- Data[apply(Data, 1, function(row) all(is.finite(row))),]
+Datas <- Data %>% sample_n(1500,replace = F)
+sapply(Datas, function(x) shapiro.test(as.numeric(x)) )
+```
+
+compute how likely are them to have the same mean
+
+
+```{r}
+combos <- combn(4,2)
+plyr::adply(combos, 2, function(x) {
+  test <- t.test(Data[, as.numeric(x[1])], Data[, as.numeric(x[2])],alternative = "t")
+
+  out <- data.frame("var1" = colnames(Data)[x[1]]
+                    , "var2" = colnames(Data[x[2]])
+                    , "t.value" = sprintf("%.5f", test$statistic)
+                    ,  "df"= test$parameter
+                    ,  "p.value" = test$p.value#sprintf("%.5f", test$p.value)
+                    )
+  return(out)
+
+})
+# mar_scores %>%
+#   dplyr::select(I_len,II_len,III_len,IV_len) %>% 
+#   dplyr::select_if(is.numeric) %>% 
+#   purrr::map_df(~ broom::tidy(t.test(. ~ grp)), .id = 'var')
+```
+
+
+
+
+
 
 
 
 Then the facets by marginalization level
-
-```{r}
-ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
-  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
-                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
-  geom_density_ridges()+
-  scale_x_continuous(limits = c(0,100))+
-  th+
-  theme(
-    axis.text.x = element_text(angle = 0),
-    panel.grid.minor = element_blank(),
-    legend.position = "none")+
-  facet_grid(~gm)+
-  theme(strip.background = element_rect(fill="#b53a31"))
-```
 
 
 
@@ -1084,20 +1175,7 @@ ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name,fill=gm,alp
 ```
 
 
-```{r}
-ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
-  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
-                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
-    geom_density_ridges()+
-  scale_x_continuous(limits = c(0,100))+
-    th+
-    theme(
-      axis.text.x = element_text(angle = 0),
-      panel.grid.minor = element_blank(),
-      legend.position = "none")+
-    facet_grid(~gm)+
-    theme(strip.background = element_rect(fill="#b53a31"))
-```
+
 
 ```{r}
 ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6, height = stat(density))) +
@@ -1116,26 +1194,12 @@ ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name,fill=gm,alp
 
 
 ```{r}
-ggplot(mar_tidy[!grepl("II_",mar_tidy$name) & grepl("I_",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
-  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
-                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
-    geom_density_ridges()+
-  scale_x_continuous(limits = c(0,100))+
-    th+
-    theme(
-      axis.text.x = element_text(angle = 0),
-      panel.grid.minor = element_blank(),
-      legend.position = "none")+
-    facet_grid(~gm)+
-    theme(strip.background = element_rect(fill="#b53a31"))
-```
-
-```{r}
 ggplot(mar_tidy[!grepl("II_",mar_tidy$name) & grepl("I_",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6, height = stat(density))) +
   scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
                         labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
     geom_density_ridges(stat = "density")+
-  scale_x_log10()+
+  scale_x_log10(name="Percentage")+
+  scale_y_discrete(name=" ")+
     th+
     theme(
       axis.text.x = element_text(angle = 0),
@@ -1143,31 +1207,35 @@ ggplot(mar_tidy[!grepl("II_",mar_tidy$name) & grepl("I_",mar_tidy$name),], aes(x
       legend.position = "none")+
     facet_grid(~gm)+
     theme(strip.background = element_rect(fill="#b53a31"))
+
+ggsave("../../figs/ridges_marg_I.png",height = 15, width = 30, units = "cm")
 ```
 
-
+We test the homogeneity of variances with an F-test because we want to see how well does an achievement level in one test explains the other.
 
 ```{r}
-ggplot(mar_tidy[grepl("IV_",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6)) +
-  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
-                        labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
-    geom_density_ridges()+
-  scale_x_continuous(limits = c(0,100))+
-    th+
-    theme(
-      axis.text.x = element_text(angle = 0),
-      panel.grid.minor = element_blank(),
-      legend.position = "none")+
-    facet_grid(~gm)+
-    theme(strip.background = element_rect(fill="#b53a31"))
+tocomp <- mar_scores %>%
+  group_by(gm) %>% 
+  select(gm,I_len,I_mat,IV_len,IV_mat)
+logss <- sapply(tocomp %>% ungroup(gm) %>% select(-gm), function(x) log10(as.numeric(x)) )
+tocomp[2:5] <- logss
+tocomp <- tocomp[apply(tocomp %>% ungroup(gm) %>% select(-gm), 1, function(row) all(is.finite(row))),]
+# tocomp <- tocomp %>% sample_n(250,replace = F)
+
+tocomp %>%
+  group_by(gm) %>% 
+  summarise(pval = fligner.test(I_len,I_mat,alternative="t")$p.value)
 ```
+
+
 
 ```{r}
 ggplot(mar_tidy[grepl("IV_",mar_tidy$name),], aes(x = (value), y = name,fill=gm,alpha=0.6, height = stat(density))) +
   scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
                         labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
     geom_density_ridges(stat = "density")+
-  scale_x_log10()+
+  scale_x_log10(name="Percentage")+
+  scale_y_discrete(name=" ")+
     th+
     theme(
       axis.text.x = element_text(angle = 0),
@@ -1175,8 +1243,48 @@ ggplot(mar_tidy[grepl("IV_",mar_tidy$name),], aes(x = (value), y = name,fill=gm,
       legend.position = "none")+
     facet_grid(~gm)+
     theme(strip.background = element_rect(fill="#b53a31"))
+ggsave("../../figs/ridges_marg_IV.png",height = 15, width = 30, units = "cm")
 ```
 
+
+Use the Fligner-Killen median test to compare the homogeneity of variances
+
+```{r}
+tocomp <- mar_scores %>%
+  group_by(gm) %>% 
+  select(gm,I_len,I_mat,IV_len,IV_mat)
+logss <- sapply(tocomp %>% ungroup(gm) %>% select(-gm), function(x) log10(as.numeric(x)) )
+tocomp[2:5] <- logss
+tocomp <- tocomp[apply(tocomp %>% ungroup(gm) %>% select(-gm), 1, function(row) all(is.finite(row))),]
+# tocomp <- tocomp %>% sample_n(300,replace = F)
+
+tocomp %>%
+  group_by(gm) %>% 
+  summarise(pval = fligner.test(IV_len,IV_mat,alternative="t")$p.value)
+```
+
+## But what about school type
+
+```{r}
+mar_tidy <- mar_scores %>% pivot_longer(c(I_len,II_len,III_len,IV_len,I_mat,II_mat,III_mat,IV_mat)) %>% unique()
+```
+
+```{r}
+mar_scores %<>% left_join(schools %>% select(CLAVE,tipo_escuela),by="CLAVE") %>% unique()
+mar_tidy2 <- mar_scores %>% pivot_longer(c(I_len,II_len,III_len,IV_len,I_mat,II_mat,III_mat,IV_mat)) %>% unique()
+ggplot(mar_tidy2[grepl("I_",mar_tidy2$name),], aes(x = (value), y = name,fill=tipo_escuela,alpha=0.6, height = stat(density))) +
+  # scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+  #                       labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+    geom_density_ridges(stat = "density")+
+  scale_x_log10()+
+    th+
+    theme(
+      axis.text.x = element_text(angle = 0),
+      panel.grid.minor = element_blank(),
+      legend.position = "none")+
+    facet_grid(~tipo_escuela)+
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
 
 
 # Let's check the Bayesian networks
@@ -1254,7 +1362,7 @@ corrM <- cor(databn_finite[,c(9:22)])
 highlyCorrelated <- findCorrelation(corrM, cutoff=0.50)
 colnames(databn_finite[,c(9:22)])[highlyCorrelated]
 databn_finite %<>% select(-illiteracy,-elementary,-less_2minwage,-dirt_floor,-less_5k)
-# databn_finite %<>% select(-gm)
+databn_finite %<>% select(-gm)
 ```
 
 
@@ -1292,15 +1400,15 @@ databn_finite %<>% select(-illiteracy,-elementary,-less_2minwage,-dirt_floor,-le
 ```
 
 
-
+I haven't figured how to save this graphs with the chunk output inline in a notebook, so we have to dissable it to run and save the plots
 
 ```{r}
-for (i in 1:8){
-  bnf <- bnlearn::h2pc(databn_finite[,c(i,9:19)])
+for (i in 1:7){
+  bnf <- bnlearn::h2pc(databn_finite[,c(i,9:17)])
   png(paste0("/figs/graph_",i,".png"))
   plot(graphviz.plot(bnf, shape = "ellipse"))
   dev.off()
-  str.diff <- bnlearn::boot.strength(databn_finite[,c(i,9:19)],R=20,algorithm="h2pc")
+  str.diff <- bnlearn::boot.strength(databn_finite[,c(i,9:17)],R=20,algorithm="h2pc")
   avg.diff <- averaged.network(str.diff)#,threshold = 0.7)
   png(paste0("/figs/graph_",i,"_boots.png"))
   plot(graphviz.plot(avg.diff, shape = "ellipse"))
@@ -1310,10 +1418,23 @@ for (i in 1:8){
 
 
 
+```{r}
+bnf <- bnlearn::h2pc(databn_finite[,c(1,9:17)])
+  str.diff <- bnlearn::boot.strength(databn_finite[,c(1,9:17)],R=20,algorithm="h2pc")
+  avg.diff <- averaged.network(str.diff)#,threshold = 0.7)
+  plot(graphviz.plot(avg.diff, shape = "ellipse"))
+```
 
 
 
 
+
+
+
+```{r}
+bnf <- bnlearn::h2pc(databn_finite[,c(1,9:17)])
+fitted <- bn.fit(bnf,databn_finite[,c(1,9:17)])
+```
 
 
 
@@ -1322,15 +1443,47 @@ graphviz.plot(bnf, shape = "ellipse")
 ```
 
 
+```{r}
+bnf <- bnlearn::h2pc(databn_finite[,c(4,9:17)])
+bnf <- bnlearn::reverse.arc(bnf,from="tipo_escuela",to="IV_porc_len")
+bnf <- bnlearn::reverse.arc(bnf,from="turno",to="IV_porc_len")
+bnf <- bnlearn::reverse.arc(bnf,from="density",to="IV_porc_len")
+fitted <- bn.fit(bnf,databn_finite[,c(4,9:17)])
+```
+
+```{r}
+graphviz.plot(bnf, shape = "ellipse")
+```
+
+
+```{r}
+bnf <- bnlearn::h2pc(databn_finite[,c(5,9:17)])
+bnf <- bnlearn::reverse.arc(bnf,from="tipo_escuela",to="I_porc_mat")
+bnf <- bnlearn::reverse.arc(bnf,from="turno",to="I_porc_mat")
+bnf <- bnlearn::reverse.arc(bnf,from="overcrowding",to="I_porc_mat")
+bnf <- bnlearn::reverse.arc(bnf,from="lang_indig",to="I_porc_mat")
+fitted <- bn.fit(bnf,databn_finite[,c(5,9:17)])
+```
 
 
 ```{r}
 graphviz.plot(bnf, shape = "ellipse")
 ```
 
+
 ```{r}
-graphviz.plot(bnaracne, shape = "ellipse")
+bnf <- bnlearn::h2pc(databn_finite[,c(8,9:17)])
+bnf <- bnlearn::reverse.arc(bnf,from="tipo_escuela",to="IV_porc_mat")
+bnf <- bnlearn::reverse.arc(bnf,from="turno",to="IV_porc_mat")
+fitted <- bn.fit(bnf,databn_finite[,c(8,9:17)])
 ```
+
+
+```{r}
+graphviz.plot(bnf, shape = "ellipse")
+```
+
+
 
 
 
