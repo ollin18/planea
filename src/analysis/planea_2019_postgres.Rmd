@@ -310,8 +310,12 @@ marginacion %>% group_by(gm) %>% summarise(n())
 How many schools
 ```{r}
 length(unique(planea$clave))
+schools %>% group_by(gm) %>% summarise(n())
 ```
 
+```{r}
+schools[!is.na(schools$IV_porc_len) & !is.na(schools$IV_porc_mat),] %>%  summarise(mean(IV_porc_len),mean(IV_porc_mat))
+```
 
 The number of schools in a municipality.
 ```{r}
@@ -415,6 +419,26 @@ mun_schools <- schools %>%
   mutate(spc = num_school/(POB/100000))
 
 ```
+
+Number of evaluated students in language
+```{r}
+sum(as.numeric(schools$evaluados_len))
+```
+
+Number of evaluated students in mathematics
+```{r}
+sum(as.numeric(schools$evaluados_mat))
+```
+
+```{r}
+unique((schools$clave)) %>% length()
+```
+
+```{r}
+unique((schools$CLAVE)) %>% length()
+```
+
+
 
 ```{r}
 mar_scores <- schools %>% select(CLAVE,POP,illiteracy,elementary,I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat)
@@ -1178,7 +1202,7 @@ ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name,fill=gm,alp
 
 
 ```{r}
-ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name,fill=gm,alpha=0.6, height = stat(density))) +
+ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = gm,fill=name,alpha=0.6, height = stat(density))) +
   scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
                         labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
     geom_density_ridges(stat = "density")+
@@ -1188,7 +1212,7 @@ ggplot(mar_tidy[grep("len",mar_tidy$name),], aes(x = value, y = name,fill=gm,alp
       axis.text.x = element_text(angle = 0),
       panel.grid.minor = element_blank(),
       legend.position = "none")+
-    facet_grid(~gm)+
+    facet_grid(~name)+
     theme(strip.background = element_rect(fill="#b53a31"))
 ```
 
@@ -1224,7 +1248,7 @@ tocomp <- tocomp[apply(tocomp %>% ungroup(gm) %>% select(-gm), 1, function(row) 
 
 tocomp %>%
   group_by(gm) %>% 
-  summarise(pval = fligner.test(I_len,I_mat,alternative="t")$p.value)
+  summarise(pval = var.test(I_len,I_mat,alternative="t")$p.value)
 ```
 
 
@@ -1260,7 +1284,7 @@ tocomp <- tocomp[apply(tocomp %>% ungroup(gm) %>% select(-gm), 1, function(row) 
 
 tocomp %>%
   group_by(gm) %>% 
-  summarise(pval = fligner.test(IV_len,IV_mat,alternative="t")$p.value)
+  summarise(pval = var.test(IV_len,IV_mat,alternative="t")$p.value)
 ```
 
 ## But what about school type
@@ -1476,11 +1500,25 @@ bnf <- bnlearn::h2pc(databn_finite[,c(8,9:17)])
 bnf <- bnlearn::reverse.arc(bnf,from="tipo_escuela",to="IV_porc_mat")
 bnf <- bnlearn::reverse.arc(bnf,from="turno",to="IV_porc_mat")
 fitted <- bn.fit(bnf,databn_finite[,c(8,9:17)])
+
+bn.fit.qqplot(fitted)
+bn.fit.barchart(fitted$IV_porc_mat)
+bn.cv(databn_finite[,c(1,9:17)],bn="h2pc")
+bn.cv(databn_finite[,c(4,9:17)],bn="h2pc")
+
+bn.cv(databn_finite[,c(5,9:17)],bn="h2pc")
+a<-bn.cv(databn_finite[,c(8,9:17)],bn="h2pc")
 ```
 
 
 ```{r}
 graphviz.plot(bnf, shape = "ellipse")
+
+1 - mat log likelihood 14.78539
+4 - mat log likelihood 15.17735
+
+1 - lan log likelihood 14.93725
+4 - lan log likelihood 14.79238
 ```
 
 
