@@ -1,7 +1,7 @@
 ---
 title: "R Notebook"
 output: html_notebook
-editor_options: 
+editor_options:
   chunk_output_type: inline
 ---
 
@@ -686,8 +686,8 @@ ggplot(mar_scores[mar_scores$gm == "Very High",])+
   geom_point(aes(I_len,I_mat))+
   th
 ```
-  
-  
+
+
 what about a very low marginalized area?
 ```{r}
 ggplot(mar_scores[mar_scores$gm == "Very Low",])+
@@ -1075,7 +1075,7 @@ ggsave("../../figs/ridges_len.png",height = 30, width = 30, units = "cm")
 ```{r}
 ggplot(mar_tidy[grep("mat",mar_tidy$name),], aes(x = value, y = name, height = stat(density))) +
   geom_density_ridges(stat = "density")+
-  scale_x_log10(name="Percentage")+
+  scale_x_continuous(name="Percentage")+
   scale_y_discrete(name="Level")+
   th
 ggsave("../../figs/ridges_math_log.png",height = 30, width = 30, units = "cm")
@@ -1121,8 +1121,8 @@ plyr::adply(combos, 2, function(x) {
 
 })
 # mar_scores %>%
-#   dplyr::select(I_len,II_len,III_len,IV_len) %>% 
-#   dplyr::select_if(is.numeric) %>% 
+#   dplyr::select(I_len,II_len,III_len,IV_len) %>%
+#   dplyr::select_if(is.numeric) %>%
 #   purrr::map_df(~ broom::tidy(t.test(. ~ grp)), .id = 'var')
 ```
 
@@ -1167,8 +1167,8 @@ plyr::adply(combos, 2, function(x) {
 
 })
 # mar_scores %>%
-#   dplyr::select(I_len,II_len,III_len,IV_len) %>% 
-#   dplyr::select_if(is.numeric) %>% 
+#   dplyr::select(I_len,II_len,III_len,IV_len) %>%
+#   dplyr::select_if(is.numeric) %>%
 #   purrr::map_df(~ broom::tidy(t.test(. ~ grp)), .id = 'var')
 ```
 
@@ -1239,7 +1239,7 @@ We test the homogeneity of variances with an F-test because we want to see how w
 
 ```{r}
 tocomp <- mar_scores %>%
-  group_by(gm) %>% 
+  group_by(gm) %>%
   select(gm,I_len,I_mat,IV_len,IV_mat)
 logss <- sapply(tocomp %>% ungroup(gm) %>% select(-gm), function(x) log10(as.numeric(x)) )
 tocomp[2:5] <- logss
@@ -1247,7 +1247,7 @@ tocomp <- tocomp[apply(tocomp %>% ungroup(gm) %>% select(-gm), 1, function(row) 
 # tocomp <- tocomp %>% sample_n(250,replace = F)
 
 tocomp %>%
-  group_by(gm) %>% 
+  group_by(gm) %>%
   summarise(pval = var.test(I_len,I_mat,alternative="t")$p.value)
 ```
 
@@ -1275,7 +1275,7 @@ Use the Fligner-Killen median test to compare the homogeneity of variances
 
 ```{r}
 tocomp <- mar_scores %>%
-  group_by(gm) %>% 
+  group_by(gm) %>%
   select(gm,I_len,I_mat,IV_len,IV_mat)
 logss <- sapply(tocomp %>% ungroup(gm) %>% select(-gm), function(x) log10(as.numeric(x)) )
 tocomp[2:5] <- logss
@@ -1283,7 +1283,7 @@ tocomp <- tocomp[apply(tocomp %>% ungroup(gm) %>% select(-gm), 1, function(row) 
 # tocomp <- tocomp %>% sample_n(300,replace = F)
 
 tocomp %>%
-  group_by(gm) %>% 
+  group_by(gm) %>%
   summarise(pval = var.test(IV_len,IV_mat,alternative="t")$p.value)
 ```
 
@@ -1297,7 +1297,7 @@ tocomp <- tocomp[apply(tocomp %>% ungroup(gm) %>% select(-gm), 1, function(row) 
 # tocomp <- tocomp %>% sample_n(250,replace = F)
 
 tocomp %>%
-  group_by(gm) %>% 
+  group_by(gm) %>%
   summarise(pval = var.test(IV_porc_len,IV_porc_mat,alternative="t")$p.value)
 ```
 
@@ -1357,7 +1357,7 @@ ggplot(schools[!is.na(schools$gm),],aes(x=(diffIV+100)/200,y=gm,fill=gm,height =
   geom_density_ridges(stat="density")+
   scale_x_log10()
 
-  
+
 # ggsave("../../figs/ridges_marg_IV.png",height = 15, width = 30, units = "cm")
 ```
 
@@ -1369,16 +1369,17 @@ ggplot(schools[!is.na(schools$gm),],aes(x=(diffI+100)/200,y=gm,fill=gm,height = 
 
 mate - lengua
 ```{r}
-schools[complete.cases(schools$gm),] %>% group_by(gm) %>% summarise(median(diffI),median(diffIV))
-schools %>% group_by(gm) %>% summarise(ci_median(log10((diffIV+100)/200))[2])
-```
-
-```{r}
 ci_median <- function(x){
   bootmed = apply(matrix(sample(x, rep=TRUE, 10^4*length(x)), nrow=10^3), 1, median)
   quantile(bootmed, c(.025,0.5, 0.975))
 }
 
+schools[complete.cases(schools$gm),] %>% group_by(gm) %>% summarise(median(diffI),median(diffIV))
+schools %>% group_by(gm) %>% summarise(ci_median(log10((diffIV+100)/200))[2])
+```
+
+
+```{r}
 schools[complete.cases(schools$gm),] %>% group_by(gm) %>% summarise(median(diffI),ci_median(diffIV)[1],ci_median(diffIV)[3])
 ```
 
@@ -1410,7 +1411,7 @@ for_bn %<>% left_join(areas_df,by="CLAVE")
 
 for_bn[!complete.cases(for_bn),]$IPOB_INDI <- 0
 for_bn[!complete.cases(for_bn),]$p_indig <- 0
-databn <- for_bn %>% ungroup(CLAVE,NOM_ENT) %>% 
+databn <- for_bn %>% ungroup(CLAVE,NOM_ENT) %>%
   select(diffI,diffIV,turno,gm,tipo_escuela,illiteracy,elementary,no_sewage,no_electricity,no_water,overcrowding,dirt_floor,less_5k,less_2minwage,im,lugar,lugarest,IPOB_INDI,p_indig,area,num,density,lang_indig)
   # select(I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat,turno,gm,tipo_escuela,illiteracy,elementary,no_sewage,no_electricity,no_water,overcrowding,dirt_floor,less_5k,less_2minwage,im,lugar,lugarest,IPOB_INDI,p_indig,area,num,density,lang_indig)
 
@@ -1458,7 +1459,8 @@ lapply(paquetines, library, character.only = TRUE)
 Delete the highly correlated variables
 ```{r}
 set.seed(42)
-corrM <- cor(databn_finite[,c(3:17)])
+# corrM <- cor(databn_finite[,c(3:17)])
+corrM <- cor(databn_finite)
 highlyCorrelated <- findCorrelation(corrM, cutoff=0.70)
 colnames(databn_finite[,c(3:17)])[highlyCorrelated]
 databn_finite %<>% select(-illiteracy,-elementary,-overcrowding,-dirt_floor,-less_5k)
@@ -1519,10 +1521,15 @@ for (i in 1:7){
 
 
 ```{r}
-bnf <- bnlearn::h2pc(databn_finite[,c(1,3:11)])
-  str.diff <- bnlearn::boot.strength(databn_finite[,c(1,3:11)],R=20,algorithm="h2pc")
-  avg.diff <- averaged.network(str.diff)#,threshold = 0.7)
-  graphviz.plot(avg.diff, shape = "ellipse")
+# the_columns <- c(diffI, turno, tipo_escuela, illiteracy, elementary, no_sewage, no_electricity, no_water, overcrowding, dirt_floor, less_5k, less_2minwage, im, p_indig, density, lang_indig)
+# bnf <- bnlearn::h2pc(databn_finite[,c(1,3:11)])
+bnf <- bnlearn::h2pc(databn_finite %>% select(diffI, turno, tipo_escuela, illiteracy, elementary, no_sewage, no_electricity, no_water, overcrowding, dirt_floor, less_5k, less_2minwage, im, p_indig, density, lang_indig))
+
+# str.diff <- bnlearn::boot.strength(databn_finite[,c(1,3:11)],R=20,algorithm="h2pc")
+str.diff <- bnlearn::boot.strength(databn_finite %>% select(diffI, turno, tipo_escuela, illiteracy, elementary, no_sewage, no_electricity, no_water, overcrowding, dirt_floor, less_5k, less_2minwage, im, p_indig, density, lang_indig),R=20,algorithm="h2pc")
+
+avg.diff <- averaged.network(str.diff)#,threshold = 0.7)
+graphviz.plot(avg.diff, shape = "ellipse")
 ```
 
 
