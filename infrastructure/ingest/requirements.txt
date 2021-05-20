@@ -1,4 +1,6 @@
 csvkit
+Cython
 requests
 pandas
 tableschema
+openpyxl

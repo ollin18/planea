@@ -41,12 +41,13 @@ prepare: deps
 deps: pip airdb
 
 pip: requirements.txt
+	# @conda install -c conda-forge --file $<
 	@pip install -r $<
 
 airdb:
 	@source .env
 	# --directory=$(AIRFLOW_HOME)
-	@airflow initdb
+	@airflow db init
 
 info:
 	@echo Project: $(PROJECT_NAME) ver. $(PROJECT_VERSION) in $(PROJ_DIR)
@@ -57,7 +58,7 @@ deldata:
 	@ yes | rm data/raw/* data/clean/*
 
 getdata:
-	@airflow backfill ingest -s $(DATE)
+	@airflow dags backfill ingest -s $(DATE)
 
 prune:
 	@docker container prune

@@ -2,9 +2,9 @@
 
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.operators.bash_operator import BashOperator
-from airflow.operators.docker_operator import DockerOperator
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.bash import BashOperator
+from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 import os
 
@@ -52,7 +52,7 @@ indigenous_ingest = DockerOperator(
         task_id='indigenous',
         image='ingest',
         volumes=[wd+'/data/:/data',wd+'/src/ingest/:/src'],
-        command='/src/indigenous_language.sh ', \
+        command='/src/indigenous_language.py ', \
         dag = dag)
 
 marginalization_ingest = DockerOperator(

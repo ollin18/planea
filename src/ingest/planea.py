@@ -50,8 +50,9 @@ colnames = ["ent",
         "IV_similar_mat"
         ]
 
-df = pd.read_excel("/data/raw/planea_sec_2019.xlsx", skiprows=4, header=None)
+df = pd.read_excel("/data/raw/planea_sec_2019.xlsx", skiprows=4, header=None, engine="openpyxl")
 df.columns = colnames
+df.ent = df.ent.map(int).map(lambda x: str(x).zfill(2))
 df.to_csv("/data/clean/planea.csv",sep="|",index=False)
 
 schema = get_schema(df,'planea')

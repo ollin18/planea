@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-wget -qO - http://www.conapo.gob.mx/work/models/CONAPO/Marginacion/Datos_Abiertos/Municipio/Base_Indice_de_marginacion_municipal_90-15.csv > /data/raw/marginalization_tmp.csv
+# wget -qO - http://www.conapo.gob.mx/work/models/CONAPO/Marginacion/Datos_Abiertos/Municipio/Base_Indice_de_marginacion_municipal_90-15.csv /data/raw/marginalization_tmp.csv
+wget http://www.conapo.gob.mx/work/models/CONAPO/Marginacion/Datos_Abiertos/Municipio/Base_Indice_de_marginacion_municipal_90-15.csv -O /data/raw/marginalization_tmp.csv
 
 iconv -f ISO-8859-1//TRANSLIT -t UTF-8 /data/raw/marginalization_tmp.csv | csvformat -D "|" > /data/raw/marginalization.csv
 
