@@ -1,0 +1,213 @@
+---
+title: The Educational Achievement and Opportunity Gaps in Mexico
+
+# Use letters for affiliations, numbers to show equal authorship (if applicable) and to indicate the corresponding author
+author:
+  - name: Ollin Demian Langle Chimal
+    affiliation: a
+address:
+  - code: a
+    address: University of Vermont, Complex Systems and Data Science, Burlington, Vermont, 05401
+
+corresponding_author:
+  - code: 2
+    text: "To whom correspondence should be addressed. E-mail: Ollin.Langle@uvm.edu"
+
+# For footer text
+lead_author_surname: Langle Chimal
+
+## Remove this if not required
+#equal_authors:
+#  - code: 1
+#    text: "A.O.(Author One) and A.T. (Author Two) contributed equally to this work (remove if not applicable)."
+
+
+#author_contributions: |
+#  Please provide details of author contributions here.
+
+## Remove this if not required
+#conflict_of_interest: |
+#  Please declare any conflict of interest here.
+
+abstract: |
+  Mexico is one of the worst performing countries in the PISA education evaluation program even though the history to fix the lag across the country has led to the implementation of novelty programs such as PROGRESA which introduced the conditional economic subsidies for development. The access to quality education in Mexico, as well as around the World, is greatly correlated to wealth and it's been long studied as one causation of the poverty trap. Using results from the mexican educational evaluation program "PLANEA" we analize the drivers for the achievement level distribution in mathematics and language and their difference to eachother, finding that municipalities with high marginalization degree tend to perform worst in language while low marginalization can be associated to a poorer performance in mathematics. Marginalization is highly correlated to the percentage of indigenous population which suggest that the disparity between achievement levels in language and math in that group could be due the testing and teaching in other than the mother tongue rather than a cognitive implication.
+
+
+significance: |
+  The study of education in marginalized areas and the achievement gap compared to developed areas has been studied greatly but little understanding for the causes of it other than nutrition and teacher quality has been made. Here we show that there is a corralation between the gap in the average achievement in language and mathematics and the indigenous population implying a structural disadvantage to the students with mother tongue other than Spanish.
+
+acknowledgements: |
+  I want to recognize the work of every community teacher whose labor for clossening the gap and work for children's wellness and rights has inspired this work. Also to all of those who collect and share information.
+  
+
+keywords:
+  - education
+  - opportunity gap
+  - indigenous language
+  - causation
+
+## must be one of: pnasresearcharticle (usual two-column layout), pnasmathematics (one column layout), or pnasinvited (invited submissions only)
+pnas_type: pnasresearcharticle
+
+bibliography: mibib.bib
+csl: pnas.csl
+
+## change to true to add optional line numbering
+lineno: false
+
+output: rticles::pnas_article
+---
+
+The National Plan for the Learning Evaluation (PLANEA for it's Spanish initials) is part of the Ministry of Public Education (SEP) efforts to evaluate the acedemic performance accross Mexico with the aim for targeted public policies. PLANEA performs several types of test to keep track of academic achievements which has been shown importance @Brunello2007, the three modalities are a national evaluation, a scholar center evaluation and a diagnostic evaluation, the first two evaluate the academic achievements at the end of both levels of obligatory education, primary @Heyneman1983 and secondary. Unlike it's predecessors such as ENLACE, it evaluates nearly the total amount of schools but only for the diagnostic evaluation on the equivalent of 6 and 9 years of consecutive education, those are called obligatory as the government has the consitutional obligation to provide it to every person in the Country.
+The track of academic scores  has been a major interest of the mexican government since the 1990s where the program PROGRESA @Schultz2004 and later OPORTUNIDADES @Parker2017 @Angelucci2013 which were the first conditional cash transfer programs in the World to be established and they wanted to evaluate their impact in the walfare @Skoufias2005. The focus of this program was to mantain school attainment @Galindo-Rueda2005, which is now consider not the best variable to track as there could be presence but no education happening in a school @Chaudhury2006. The biggest difference between Mexico's approach and the rest of the region is that Mexico focuses in public education while other countries like Colombia have voucher programs like PACES for children to be educated in private schools @Angrist2006 @Lamarche2011.
+The latest test was performed on 2019 accounting for 32,390 schools for a total of 1,015,597 students evaluated on the language part and 1,011,926 on mathematics. This over 1,992 of the 2,457 municipalities in Mexico at that time. The reslts for each school are summarized by the percentage of students in each of the 4 levels of achievement for both areas.
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{|c|c|}
+  \hline
+  Level & Equivalence \\ \hline
+  IV                       & Outstanding                       \\ \hline
+  III                       & Satisfactory                       \\ \hline
+  II                       & Sufficient                       \\ \hline
+  I                       & Insufficient                       \\ \hline
+  \end{tabular}
+\caption{Achievement levels in the PLANEA test}
+\label{table:levels}
+\end{table}
+
+In order to understand how the context affects education other data sources are necessary. There is an extensive literature
+that reviews the socioeconomic effects on schooling @Brunello2007. The National
+Population Council (CONAPO) runs an evaluation of marginalization by municipality every 5 years which
+is a multidemensional metric that takes four category needs into account; education, dwelling, population
+distribution and monetary income, the educational part takes into account the percentage of illiterate over
+the age of 15 people and the percentage of people over 15 that didn’t the 6th grade of education. This
+multidimensional metric stratifies the municipalities into 5 groups; very low, low, medium, high and very
+high.
+
+\begin{table}[H]
+     \centering
+     \begin{tabular}{|c|c|c|}
+     \hline
+     Marginalization & Number of municipalities & Number of schools\\ \hline
+     Very Low & 345 & 13153\\ \hline
+     Low & 498 & 6199\\ \hline
+     Medium & 514 & 5708\\ \hline
+     High & 817 & 6777\\ \hline
+     Very High & 283 & 2372\\ \hline
+     \end{tabular}
+     \caption{Number of municipalities and schools by marginalization level. There were 5 schools in municipalities without marginalization information.}
+     \label{tab:marginalization}
+\end{table}
+
+The number of municipalities with high marginalization degree exceeds the ones with lower values of it but the number of schools in those are more as we can see from table\ref{tab:marginalization}.
+
+The impact of the circumstances on the achievement levels can be seen in figures \ref{fig:achlevels} and \ref{fig:achlevelsmar} which are very
+similar but let us see different trends in the data. Figure \ref{fig:achlevels}  shows the effect of the school being in a certain
+level of marginalization on distribution of the student’s percentage given the type of school, on the other
+hand figure \ref{fig:achlevelsmar} depicts the effect of the school type on the levels of marginalization which has been discussed in @Chmielewski2019 and conditioned to gender in @Golsteyn2014. On the first one something
+very important emerges on the language test, the median over type of schools is somewhat preserved over all
+marginalization levels but for the very high one and this effect is not equally extreme for the mathematics
+test, is important to analyze this with statistical rigor. The second figure shows an equally interesting but
+unsurprising result, regardless of the marginalization level private schools’ students perform better on the
+test.
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth,height=10cm]{figs/achievement_levels.png}
+    \caption{Distribution of student percentage of a school in each achievement level grouped by marginalization index and school type.}
+    \label{fig:achlevels}
+\end{figure*}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth,height=10cm]{figs/achievement_levels_by_marginalization.png}
+    \caption{Distribution of student percentage of a school in each achievement level grouped by school type and marginalization index.}
+    \label{fig:achlevelsmar}
+\end{figure*}
+
+Because of the aggregated format in which the data is released it is not possible to have a unique target variable, instead we have the distributions of the percentage of students by school
+that falls inside a certain level group, thus we have 4 variables of interest.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{figs/stacked_math.png}
+\caption{Choropleth map for the mean percentage of students by achievement levels of the mathematics part of the PLANEA test.}
+\label{fig:stackedmath}
+\end{figure}
+
+The figure \ref{fig:stackedmath} shows the geographical distribution of the mean percentage of students by municipality with scores equivalent to each achievement level. The number of students with insufficient grades greatly exceeds those on the other mark groups. This map also let us see that most of the municipalities without data are in Oaxaca where the indigenous population is high. The zone with higher mean values of achievement is the north-west region, specifically Sonora and Sinaloa.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{figs/stacked_language.png}
+\caption{Choropleth map for the mean percentage of students by achievement levels of the language part of the PLANEA test.}
+\label{fig:stackedlan}
+\end{figure}
+
+On the other hand figure \ref{fig:stackedlan} shows that the distributions for the language part of the test are quite different from those for mathematics. 
+This subject-matter shows that even though the distribution is still skewed towards the lower levels, the difference between the I and II groups is dimnished compared to the one in figure \ref{fig:stackedmath} with 6.1% of the students compared to 8.5% in mathematics, in the case of the level I groups the mean values are 37.8% in language and 56.8% in mathematics. This means that less students fail badly in the language tasks but also less students excel.
+
+It's important to note that as both test weren't performed one after the other, the number of students who took them is not the same, we have the information of 1,012,267 students for the mathematical part and 1,016,087 in the language counterpart. The data contains a column about if the percentage of students present in the test are a representative sample of the school, but the documentation neglects to explain the methodology and by manual inspection we found that is not only based on the percentage of students present as there are different cut-offs for different schools and test part, then, as we don't have the information to asume this as valide we kept those school where the percentage in both tests were more than the 50%. Then the number of students evaluated in language was reduced to 1,008,233 and to 1,004,766. Still it contains above a million records for both. Now the number of schools kept is 31,554 in 1,988 municipalities.
+ 
+Achievement difference between language and mathematics {.unnumbered}
+========================================
+
+When evaluating the academic performance by regions we usually see one-to-one comparisons between them for the same subject-matters but the difference of achivements on them could give us valuable information about the structure of the educational planning. 
+
+\begin{figure}[H]
+\subfigure{\includegraphics[width=\columnwidth]{figs/ridges_marg_I.png}
+\label{fig:ridgeI}}
+\quad
+\subfigure{\includegraphics[width=\columnwidth]{figs/ridges_marg_IV.png}
+\label{fig:ridgeIV}}
+\caption{Distribution density in log10 scale of the percentage of students by municipality in the lowest and highest achievement level.}
+\label{fig:ridgeMarg}
+\end{figure}
+
+The PLANEA program tests for two different areas of cognitive development and in a completely equal disadvantage we should expect to see the same correlation between same level of achievements between the both of them but figure \ref{fig:ridgeMarg} shows that the log distribution of the percentage of students in the level one groups are different for the very low marginalization level (p-value: 2.58e-8, two sided F-test) while they are the same for very the very high one (p-value: 6.70e-1, two sided F-test). As the hypothesis is that the gap is the same in every municipality, i.e. we have the same disadvantage for both test parts, we used a F-test to compare the variances of the two samples and see how good of a fit is one for the other. For the level IV group we conclude that for the very low marginalization municipalities the log distributions are the same (p-value: 6.44e-1, two sided F-test) while for the very high marginalization it's inconclusive depending on the significance threshold (p-value: 7.73e-2, two sided F-test). Visual inspection of figure \ref{fig:ridgeMarg} shows that there is indeed a difference. In particular for the language part of the test the municipalities with a very low marginalization level more students' percentage have an insufficient mathematical performance in the test than they do on the language areas but that difference vanishes on the very marginalized ones where they perform as poorly. On the level IV this behaviour is reversed, municipalities with low marginalization that do well in one do it too on the other but as marginalization increases less percentage of students with outstanding performance in mathematics excels in language too.
+
+The previous results suggests that there is a non-cognitive variable associated with the gap between the parts of the test. The overall performance difference is usually explained by the inaccessibility to schools or quality education @Alon2009 @Marks2005, working children, parent meritocracy @Alon2007 @Brown1990 @Duncan2011, lack of nutritious food @Angeluci2013 @Attanasio2013, absent educators @Chaudhury2006, lack of estimulation outside the academic environment @Alexander2007 @Mare1980, etc., but all of these account for the same in both parts of the test and there should be an enviromental variable that explains this pattern of children in unfavored conditions which can affect their later entrance to a school with standardize admision test and poor integration @Reardon2016 @Valenzuela2014.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{figs/indi_vs_marg.png}
+\caption{Distribution of indigenous population by marginalization level.}
+\label{fig:indiMarg}
+\end{figure}
+
+Being Mexico the large multicultural country that is, it's important to understand the drivers of this phenomena as the integration of all the nations inside the country is not yet achieved and the unlike other developing countries such as Malasya @Saw2016, inequality between groups is very large. Using the intercensal survey gathered by the National Population Council (CONAPO) and the National Comission for the Development of Indigenous Peoples (CDI) we were able to cross the information of percentage of people that speaks an indigenous language and the variables that make up the multidimensional definition of poverty and marginalization in Mexico which have been studied in the relationship between schools and inequality @Downey2016 @VandeWerfhorst2018. Figure \ref{fig:indiMarg} depicts that the most marginalized areas in Mexico have a high concentration of indigenous people and therefore a social explanation of why this lag of language development is happening in those regions @Reinke2004 @Despagne2013 @Lopez-Gopar2007 .
+
+
+Causality of the achievement levels {.unnumbered}
+========================================
+
+Understanding the mechanisms by which a phenomena occurs is the the most important part for program planning or any type of public policy directed to tackle an specific problem and while descriptive statistics can yield important findings the use of inferential statistics is crucial to extract any conclusions about a certain population and advance into policy treatments @Scott2002. Then in order to understand what specific variables have an impact on the test scores we performed a causality analysis which is regularely used in education programs @Kaplan2016. The variables we used were illiteracy, percentage of adult population without elementary school, percentage of people living under 2 minimum wages a month, percentage of dirt floors in houses, municipalities with less than 5 thousand population, percentage of houses without electricity access, percentage of houses without sewage, percentage of houses without clean water access, percentage of overcrowding, school shift, school type and schools by square km in the municipality. After a feature simple feature selection process we only kept the eight less correlated ones and use a Hybrid Hybrid Parents & Children (H2PC)@h2pc algorithm to learn the structure of the directed acyclic graphs and then used the DAG structure to do a regression analysis.
+
+\begin{figure*}
+\subfigure{\includegraphics[width=\columnwidth]{figs/dag_I_len.png}
+\label{fig:dagIlen}}
+\quad
+\subfigure{\includegraphics[width=\columnwidth]{figs/dag_IV_len.png}
+\label{fig:dagIVlen}}
+\quad
+\subfigure{\includegraphics[width=\columnwidth]{figs/dag_I_mat.png}
+\label{fig:dagImat}}
+\quad
+\subfigure{\includegraphics[width=\columnwidth]{figs/dag_IV_mat.png}
+\label{fig:dagIVmat}}
+\caption{DAG structure for causality of the extreme groups (I and IV) for the language (above) and mathematics (below) tasks in the PLANEA test.}
+\label{fig:dags}
+\end{figure*}
+
+After learning the DAG structure for the language scores we find that the I and IV groups share most of their parents, the intersection and their values of the fitted regression analysis for the group I is school type (-0.063), school shift (0.048), school density (-0.045) and overcrowding (0.005) with $\sigma=0.28$. The only non categorical one with a positive relation is density, thus the more schools per area less failures in language tasks. The shared regression parameters for the group IV are school type (0.082), school shift (-0.049), school density (0.038) and overcrowding (-0.007) with $\sigma=0.32$. The signed are reversed with respect to the ones from group I which is expected as they are the extreme values. It is interesting that no indigenous population variable were directly linked to them and even on the other extreme of the leaves.
+
+In the case of the mathematics task both levels share the same parents, the regression values for the level I are school shift (0.021), school type (-0.056), overcrowding (0.001) and percentage of indigenous language speakers (-0.068) on the other hand for the level IV group we have school shift (-0.033), school type (0.094), overcrowding (-0.003) and percentage of indigenous language speakers (0.173). Again we have the parameters' signs shifted but interestingly they also are with respect of the same achievement level groups for the language task. Surprisingly the percentage of indigenous language speakers appears as a parent for both of them when it wasn't for the language ones.
+
+
+
+
+<!-- Leave these lines as they are at the end of your .Rmd file to ensure placement of methods & acknowledgements sections before the references-->
+\showmatmethods
+\showacknow
+\pnasbreak
