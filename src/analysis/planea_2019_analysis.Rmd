@@ -1,0 +1,327 @@
+---
+title: "Planea 2019"
+output: pdf_document
+---
+
+```{r, warning=FALSE, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE)
+source("aux_functions.R")
+```
+
+First we connect to our Postgres database
+```{r, warning=FALSE, echo=FALSE, include=FALSE}
+con <- plan_connect()
+```
+
+And we load the PLANEA 2019 results
+```{r, warning=FALSE, echo=FALSE, include=FALSE}
+query <- load_table(con,public,planea)
+planea <- query %>% retrieve_result()
+clear_results(con)
+```
+
+Change results type to numeric (TODO: set this schema in the airflow ingest pipeline)
+```{r, warning=FALSE, echo=FALSE}
+the_names <- colnames(planea)
+logros <- the_names[c(grep("I_",the_names), grep("V_",the_names))]
+planea[logros] <- sapply(planea[logros],as.numeric)
+planea$municipio <- planea$municipio %>% iconv(from="UTF-8",to="ASCII//TRANSLIT") %>% toupper()
+```
+
+
+We need to change some municipalities names in order to join this database with the CONAPO one.
+This are the missed-matched names in the tables of the database. I'll change the ones from the schools.
+```{r, warning=FALSE, echo=FALSE}
+from_schools <- c("CD. DEL CARMEN","DOCTOR BELISARIO DOMINGUEZ","TEMOSACHI","PEJPYON BLANCO","DOLORES HIDALGO","SILAO","ZAPOTLAN EL GRANDE (CIUDAD GUZMAN)","CUAUTITLAN (DE GARCIA BARRAGAN)","SAN MARTIN DE BOLA&OS","CA&ADAS DE OBREGON","SAN JOSE? DEL RINCON","VALLE DE CHALCO SOLIDARIDA","SAN MARTIN DE LAS PIRAMIDE","HEROICA ZITACUARO","TANHUATO DE GUERRERO","ARIO DE ROSALES","TUMBISCATIO DE RUIZ","JUNGAPEO DE JUAREZ","ACUITZIO DEL CANJE","SUSUPUATO DE GUERRERO","GABRIEL ZAMORA (LOMBARDIA)","BENITO JUAREZ (LAURELES)","HUETAMO DE NUNEZ","TIQUICHEO","TLALPUJAHUA DE RAYON","PARACHO DE VERDUZCO","DR. BESLISARIO DOMINGUEZ","TLALTIZAPAN","EL NAYAR","SAN MATEO YUCUTINDO","EL ROSARIO","ATLTZAYANCA","MEDELLIN DE BRAVO","NANCHITAL DE LAZARO CARDENAS DEL RI")
+
+to_conapo <- c("CARMEN","DR. BELISARIO DOMINGUEZ","TEMOSACHIC","PENON BLANCO","DOLORES HIDALGO CUNA DE LA INDEPENDENCIA NACIONAL","SILAO DE LA VICTORIA","ZAPOTLAN EL GRANDE","CUAUTITLAN DE GARCIA BARRAGAN","SAN MARTIN DE BOLANOS","CANADAS DE OBREGON","SAN JOSE DEL RINCON","VALLE DE CHALCO SOLIDARIDAD","SAN MARTIN DE LAS PIRAMIDES","ZITACUARO","TANHUATO","ARIO","TUMBISCATIO","JUNGAPEO","ACUITZIO","SUSUPUATO","GABRIEL ZAMORA","JUAREZ","HUETAMO","TIQUICHEO DE NICOLAS ROMERO","TLALPUJAHUA","PARACHO","DR. BELISARIO DOMINGUEZ","TLALTIZAPAN DE ZAPATA","DEL NAYAR","SAN MATEO YUCUTINDOO","ROSARIO","ALTZAYANCA","MEDELLIN","NANCHITAL DE LAZARO CARDENAS DEL RIO")
+
+planea$municipio <- plyr::mapvalues(planea$municipio, to=to_conapo, from=from_schools)
+```
+
+Load the CONAPO table
+```{r, warning=FALSE, echo=FALSE, include=FALSE}
+the_options <- "WHERE \"ANO\" = 2015"
+query <- load_query(con,public,conapo,options=the_options)
+conapo <- query %>% retrieve_result()
+clear_results(con)
+conapo$CLAVE <- conapo$CLAVE %>% str_pad(width=5,pad="0")
+conapo$NOM_ENT %<>% str_replace_all("Oaxaca.*","Oaxaca")
+conapo$MUN <- conapo$MUN %>% iconv(from="UTF-8",to="ASCII//TRANSLIT") %>% toupper() %>% str_replace_all("SAN PEDRO MIXTEPEC.*","SAN PEDRO MIXTEPEC")
+conapo %<>% select(CLAVE,NOM_ENT,MUN,SEXO,POB) %<>% dplyr::group_by(CLAVE,NOM_ENT,MUN) %>% dplyr::summarise(POP=sum(POB))
+```
+
+
+Load the marginalization table and change the variable names to usable ones.
+```{r, warning=FALSE, echo=FALSE}
+the_options <- "WHERE \"YEAR\" = 2015"
+query <- load_query(con,public,marginalization,options=the_options)
+marginacion <- query %>% retrieve_result()
+clear_results(con)
+
+# TODO change this to SQL query
+marginacion %<>% select(-CVE_ENT,-ENT,-MUN,-VP)
+colnames(marginacion) <- c("CLAVE","pop_marg","illiteracy","elementary","no_sewage","no_electricity","no_water","overcrowding","dirt_floor","less_5k","less_2minwage","ovsd","ovsdse","im","gm","ind0a100","lugar","lugarest","YEAR")
+
+# TODO set CLAVE as TEXT in marginalization schema for SQL ingest in pipeline
+marginacion$CLAVE <- as.character(marginacion$CLAVE) %>% str_pad(width=5,pad="0")
+col2num <- colnames(marginacion %>% select(-CLAVE,-gm))
+marginacion[col2num] <- sapply(marginacion[col2num],as.numeric)
+
+marginacion <- marginacion[!is.na(marginacion$gm),]
+
+englishM <- c("Very Low","Low", "Medium", "High", "Very High")
+spanishM <- c("Muy bajo","Bajo", "Medio", "Alto", "Muy alto")
+marginacion$gm <- plyr::mapvalues(marginacion$gm, to=englishM, from=spanishM)
+marginacion$gm <- factor(marginacion$gm,levels=c("Very Low","Low","Medium","High","Very High"))
+```
+
+Join the three tables. I should run this in Postgres. *TODO* write SQL statement. But for this we should have the same values from ingest.
+```{r, warning=FALSE, echo=FALSE}
+schools <- conapo %>% right_join(planea,by=c("NOM_ENT"="entidad","MUN"="municipio")) %>% left_join(marginacion, by="CLAVE") %>% ungroup(NOM_ENT)
+schools$tipo_escuela <- factor(schools$tipo_escuela,levels=c("Comunitaria","General Pública","Técnica Pública","Telesecundaria","Privada"))
+
+englishT <- c("Public", "Technical", "Telesecundaria", "Community", "Private")
+spanishT <- c("General Pública","Técnica Pública", "Telesecundaria", "Comunitaria", "Privada")
+schools$tipo_escuela <- plyr::mapvalues(schools$tipo_escuela, to=englishT, from=spanishT)
+
+schools %<>% filter(!is.na(gm))
+```
+
+
+```{r, warning=FALSE, echo=FALSE}
+marginacion %>% group_by(gm) %>% summarise("Number of municipalities" = n()) %>% knitr::kable()
+```
+
+How many schools by Marginalization Level
+```{r, warning=FALSE, echo=FALSE}
+schools %>% group_by(gm) %>% summarise("Number of schools" = n()) %>% knitr::kable()
+```
+
+How many schools by School Type
+```{r, warning=FALSE, echo=FALSE}
+schools %>% group_by(tipo_escuela) %>% summarise("Number of schools" = n()) %>% knitr::kable()
+```
+
+Number of schools by type and marginalization level
+```{r, warning=FALSE, echo=FALSE}
+schools %>% group_by(gm,tipo_escuela) %>% summarise("Number of schools" = n()) %>% pivot_wider(names_from = tipo_escuela, values_from = "Number of schools") %>% knitr::kable()
+```
+
+Schools to population ratio by type and marginalization level
+```{r, warning=FALSE, echo=FALSE}
+ratio <- schools %>%
+  group_by(CLAVE) %>%
+  summarise(POP = unique(POP), gm, tipo_escuela) %>%
+  group_by(CLAVE, gm, tipo_escuela) %>%
+  summarise(n=n(), "POP" = unique(POP)) %>%
+  group_by(gm, tipo_escuela) %>%
+  summarise(n=sum(n), POP=sum(POP)/100000) %>%
+  mutate(ratio=n/POP)
+
+ratio %>% 
+  pivot_wider(names_from = tipo_escuela, values_from = ratio, id_cols = gm) %>%
+  knitr::kable()
+```
+
+Heatmap of the ratio
+```{r, warning=FALSE, echo=FALSE,}
+ggplot(ratio)+
+  coord_equal()+
+  geom_tile(aes(gm, tipo_escuela, fill=log10(ratio)))
+```
+
+
+Select only the schools with more than 50% of the students tested at both Language and Math
+```{r}
+schools <- schools[(schools$porc_len > 50 & schools$porc_mat > 50),]
+mun_schools <- schools %>%
+  select(CLAVE,escuela,POP,marginacion,gm,elementary,illiteracy) %>%
+  unique() %>% dplyr::group_by(CLAVE) %>%
+  dplyr::summarise(num_school = n(),POB=unique(POP),elementary=unique(elementary),illiteracy=unique(illiteracy),gm=unique(gm)) %>%
+  mutate(spc = num_school/(POB/1000))
+
+```
+
+
+```{r}
+ggplot(mun_schools)+
+  geom_boxplot(aes(gm, num_school))
+```
+
+
+```{r}
+ggplot(mun_schools)+
+  geom_boxplot(aes(gm, spc))
+```
+
+
+```{r}
+mar_scores <- schools %>% select(CLAVE,POP,illiteracy,elementary,I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat)
+
+schools_l <- schools %>% group_by(CLAVE, clave, escuela, gm) %>% summarise(num_school=n(),POP=unique(POP),illiteracy=unique(illiteracy),elementary=unique(elementary),I_len = median(I_porc_len),II_len = median(II_porc_len),III_len = median(III_porc_len),IV_len = median(IV_porc_len),
+                                                    I_mat = median(I_porc_mat),II_mat = median(II_porc_mat),III_mat = median(III_porc_mat),IV_mat = median(IV_porc_mat))
+
+mar_scores %<>% group_by(CLAVE) %>% dplyr::summarise(num_school=n(),POP=unique(POP),illiteracy=unique(illiteracy),elementary=unique(elementary),I_len = median(I_porc_len),II_len = median(II_porc_len),III_len = median(III_porc_len),IV_len = median(IV_porc_len),
+                                                    I_mat = median(I_porc_mat),II_mat = median(II_porc_mat),III_mat = median(III_porc_mat),IV_mat = median(IV_porc_mat))
+```
+
+
+Translate some variables to english. There are some with peculiar name that shouldn't be translated.
+```{r}
+schools_tidy <- schools %>% select(tipo_escuela,gm,I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat)
+schools_tidy %<>% pivot_longer(c(I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat))
+
+results <- c("Language I", "Language II", "Language III", "Language IV", "Math I", "Math II", "Math III", "Math IV")
+resultados <- c("I_porc_len","II_porc_len","III_porc_len","IV_porc_len","I_porc_mat","II_porc_mat","III_porc_mat","IV_porc_mat")
+
+schools_tidy$name <- plyr::mapvalues(schools_tidy$name, to=results, from=resultados)
+
+# schools_tidy$tipo_escuela <- factor(schools_tidy$tipo_escuela,levels=c("General Pública","Técnica Pública","Telesecundatia","Privada","Comunitaria"))
+```
+
+
+
+Define the colors
+```{r}
+altoc <- "#e3b23c"
+bajoc <- "#725752"
+medioc <- "#fe64a3"
+maltoc <- "#78bc61"
+mbajoc <- "#4f359b"
+```
+
+```{r}
+mt <- ggplot(schools_tidy, fig.width=48, fig.height=40)+
+  geom_boxplot(aes(tipo_escuela,value,fill=gm),alpha=0.8)+
+  scale_fill_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  scale_x_discrete(name="School Type")+
+  scale_y_continuous(name = "Student percentage")+
+  # theme_classic()+
+  ggtitle("School-wise student percentage by achievement level")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+mt + facet_grid(vars(name))+
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+```
+
+```{r}
+comc <- "#efecca"
+privc <- "#db2b39"
+pubgc <- "#f7ff58"
+pubtc <- "#ff934f"
+telec <- "#29335c"
+```
+
+```{r}
+mt <- ggplot(schools_tidy)+
+  geom_boxplot(aes(gm,value,fill=tipo_escuela),alpha=0.8)+
+  scale_fill_manual(name = "School Type", values = c("Community" = comc, "Private" = privc, "Public" = pubgc, "Technical" = pubtc, "Telesecundaria" = telec))+
+  scale_x_discrete(name="Marginalization")+
+  scale_y_continuous(name = "Student percentage")+
+  ggtitle("School-wise student percentage by achievement level")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+mt + facet_grid(vars(name)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+```
+```{r}
+require(gridExtra)
+```
+
+```{r, out.width="100%"}
+uno <- ggplot(schools)+
+  geom_boxplot(aes(tipo_escuela,IV_porc_mat,fill=gm),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+dos <- ggplot(schools)+
+  geom_boxplot(aes(gm,IV_porc_mat,fill=tipo_escuela),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+ 
+grid.arrange(uno, dos, ncol=1)
+```
+
+
+```{r, out.width="100%"}
+uno <- ggplot(schools)+
+  geom_boxplot(aes(tipo_escuela,I_porc_mat,fill=gm),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+dos <- ggplot(schools)+
+  geom_boxplot(aes(gm,I_porc_mat,fill=tipo_escuela),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+ 
+grid.arrange(uno, dos, ncol=1)
+```
+
+
+```{r, out.width="100%"}
+uno <- ggplot(schools)+
+  geom_boxplot(aes(tipo_escuela,IV_porc_mat-IV_porc_len,fill=gm),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+dos <- ggplot(schools)+
+  geom_boxplot(aes(gm,I_porc_mat-IV_porc_len,fill=tipo_escuela),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+ 
+grid.arrange(uno, dos, ncol=1)
+```
+
+
+```{r, out.width="100%"}
+uno <- ggplot(schools)+
+  geom_boxplot(aes(tipo_escuela,I_porc_mat-I_porc_len,fill=gm),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+
+dos <- ggplot(schools)+
+  geom_boxplot(aes(gm,I_porc_mat-I_porc_len,fill=tipo_escuela),alpha=0.6)+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank())
+ 
+grid.arrange(uno, dos, ncol=1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

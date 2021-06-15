@@ -8,7 +8,7 @@ editor_options:
 #  This is for the latest 2019 PLANEA test!
 
 ```{r,echo=FALSE,warning=FALSE,include=FALSE}
-paquetines <- c("readxl","magrittr","dplyr","ggplot2","tidyr","readr","stringr","fuzzyjoin","rstan","DBI","RPostgreSQL","rangeMapper","bnlearn","BiocManager")
+paquetines <- c("readxl","magrittr","dplyr","ggplot2","tidyr","readr","stringr","fuzzyjoin","rstan","DBI","RPostgreSQL","rangeMapper","bnlearn","BiocManager","mapproj")
 no_instalados <- paquetines[!(paquetines %in% installed.packages()[,"Package"])]
 if(length(no_instalados)) install.packages(no_instalados)
 BiocManager::install("Rgraphviz")
@@ -156,6 +156,32 @@ join_tables <- function(left_table, left_key, right_table, right_key){
     return(in_tables)
 }
 
+WKT2SpatialPolygonsDataFrame <- function(dat, geom, id) {
+	dl = split(dat, dat[, id])
+
+	o = lapply(dl, function(x) {
+
+		p = mapply(rgeos::readWKT, text = x[, geom], id = 1:nrow(x), USE.NAMES = FALSE )
+			if(length(p) == 1) {
+				p = p[[1]]
+				p = spChFIDs(p, as.character(x[1, id]))
+				}
+
+			if(length(p) > 1) {
+				p = do.call(sp::rbind.SpatialPolygons, p)
+				p = rgeos::gUnionCascaded(p, id = as.character(x[1, id]) )
+				}
+	p
+	})
+
+	X = do.call(sp::rbind.SpatialPolygons, o)
+	dat = data.frame(id = sapply(slot(X, "polygons"), function(x) slot(x, "ID")) )
+	row.names(dat ) = dat$id
+	names(dat) = id
+	X = sp::SpatialPolygonsDataFrame(X, data =  dat)
+	X
+	}
+
 #' @title retrieve_result
 #'
 #' @description Return the fetch results of a query
@@ -207,11 +233,31 @@ load_geom <- function(connection,schema,the_table,columns="\"CVEGEO\", \"CVE_ENT
                              sprintf(complete,columns,schema,the_table)) %>%
     retrieve_result()
 
-    mun_shp = rangeMapper::WKT2SpatialPolygonsDataFrame(initial, geom = "geom", id = col_shape)
+    mun_shp = WKT2SpatialPolygonsDataFrame(initial, geom = "geom", id = col_shape)
+    # mun_shp = sp::SpatialPolygonsDataFrame(initial, geom = "geom", id = col_shape)
     mun_df <- fortify(mun_shp, region = col_shape)
     names(mun_df)[names(mun_df)=="id"] <- col_shape
 
     return(mun_df)
+}
+
+load_geom2 <- function(connection,schema,the_table,columns="\"CVEGEO\", \"CVE_ENT\", \"CVE_MUN\"", geom_col, col_shape, options=""){
+    geom_col <- deparse(substitute(geom_col))
+    schema    <- deparse(substitute(schema))
+    the_table <- deparse(substitute(the_table))
+    col_shape <- deparse(substitute(col_shape))
+    geom_col2 <- paste0("\"",geom_col,"\"")
+
+    the_query <- "SELECT %s FROM %s.%s"
+    geom_col_as <- sprintf(", %s as geom",geom_col2)
+    columns <- paste0(columns,geom_col_as)
+    complete <- paste0(the_query," ",options)
+
+    initial <- RPostgreSQL::dbSendQuery(connection,
+                             sprintf(complete,columns,schema,the_table)) %>%
+    retrieve_result()
+
+    return(initial)
 }
 
 #' @title discon_db
@@ -357,7 +403,7 @@ ggplot(num_schools)+
   th
 
 # This path should point to a place inside the docker container
-ggsave("../../figs/powerlaw_school_mun.png",width = 15,height = 10,units = "cm")
+# ggsave("../../figs/powerlaw_school_mun.png",width = 15,height = 10,units = "cm")
 ```
 
 ```{r}
@@ -370,7 +416,7 @@ ggplot(num_schools)+
   ggtitle("Municipalities by number of schools")+
   th
 
-ggsave("../../figs/powerlaw_school_mun_log.png",width = 15,height = 10,units = "cm")
+# ggsave("../../figs/powerlaw_school_mun_log.png",width = 15,height = 10,units = "cm")
 ```
 
 
@@ -442,6 +488,9 @@ unique((schools$CLAVE)) %>% length()
 
 ```{r}
 mar_scores <- schools %>% select(CLAVE,POP,illiteracy,elementary,I_porc_len,II_porc_len,III_porc_len,IV_porc_len,I_porc_mat,II_porc_mat,III_porc_mat,IV_porc_mat)
+schools_l <- schools %>% group_by(CLAVE, clave, escuela, gm) %>% summarise(num_school=n(),POP=unique(POP),illiteracy=unique(illiteracy),elementary=unique(elementary),I_len = median(I_porc_len),II_len = median(II_porc_len),III_len = median(III_porc_len),IV_len = median(IV_porc_len),
+                                                    I_mat = median(I_porc_mat),II_mat = median(II_porc_mat),III_mat = median(III_porc_mat),IV_mat = median(IV_porc_mat))
+
 mar_scores %<>% group_by(CLAVE) %>% dplyr::summarise(num_school=n(),POP=unique(POP),illiteracy=unique(illiteracy),elementary=unique(elementary),I_len = mean(I_porc_len),II_len = mean(II_porc_len),III_len = mean(III_porc_len),IV_len = mean(IV_porc_len),
                                                     I_mat = mean(I_porc_mat),II_mat = mean(II_porc_mat),III_mat = mean(III_porc_mat),IV_mat = mean(IV_porc_mat))
 ```
@@ -475,6 +524,8 @@ resultados <- c("I_porc_len","II_porc_len","III_porc_len","IV_porc_len","I_porc_
 schools_tidy$tipo_escuela <- plyr::mapvalues(schools_tidy$tipo_escuela, to=englishType, from=spanishType)
 schools_tidy$name <- plyr::mapvalues(schools_tidy$name, to=results, from=resultados)
 schools_tidy$gm <- plyr::mapvalues(schools_tidy$gm, to=englishM, from=spanishM)
+
+schools_l$gm <- plyr::mapvalues(schools_l$gm, to=englishM, from=spanishM)
 
 # schools_tidy$tipo_escuela <- factor(schools_tidy$tipo_escuela,levels=c("General Pública","Técnica Pública","Telesecundatia","Privada","Comunitaria"))
 ```
@@ -746,6 +797,49 @@ ggsave("../../figs/math_vs_language_VI_all_log.png",height = 20, width = 40, uni
 ```
 
 
+```{r}
+mt <- ggplot(schools_l)+
+  geom_point(aes((IV_len),(IV_mat),color=gm))+
+  scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  coord_fixed()+
+  geom_abline()+
+  scale_x_continuous(name = "percentage language")+#,limits = c(0,100))+
+  scale_y_continuous(name = "percentage mathematics")+#,limits = c(0,100))+
+  ggtitle("Achievement Level IV by marginalization")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+mt + facet_grid(cols=vars(gm)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+```
+
+
+```{r}
+schools_l %<>% mutate(diff_I = I_len-I_mat, diff_IV = IV_len-IV_mat)
+
+mt <- ggplot(schools_l)+
+  geom_point(aes((diff_IV),(diff_I),color=gm))+
+  scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  coord_fixed()+
+  geom_abline()+
+  scale_x_continuous(name = "percentage language")+#,limits = c(0,100))+
+  scale_y_continuous(name = "percentage mathematics")+#,limits = c(0,100))+
+  ggtitle("Achievement Level IV by marginalization")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+mt + facet_grid(cols=vars(gm)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+```
 
 
 ```{r}
@@ -771,6 +865,32 @@ ggsave("../../figs/math_vs_language_IV_log.png",height = 20, width = 40, units =
 ```
 
 
+
+```{r}
+mt <- ggplot(mar_scores)+
+  geom_point(aes((IV_len),(IV_mat),color=gm))+
+  scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
+                      labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
+  coord_fixed()+
+  geom_abline()+
+  scale_x_continuous(name = "percentage language")+#,limits = c(0,100))+
+  scale_y_continuous(name = "percentage mathematics")+#,limits = c(0,100))+
+  ggtitle("Achievement Level IV by marginalization")+
+  th+
+  theme(
+    axis.text.x = element_text(angle = 0),
+    panel.grid.minor = element_blank(),
+    legend.position = "none")
+
+mt + facet_grid(cols=vars(gm)) +
+    theme(strip.background = element_rect(fill="#b53a31"))
+
+```
+
+
+
+
+
 ```{r}
 lm((IV_mat) ~ (IV_len),mar_scores[mar_scores$gm == "Very Low",])
 lm((IV_mat) ~ (IV_len),mar_scores[mar_scores$gm == "Very High",])
@@ -785,7 +905,7 @@ mt <- ggplot(mar_scores)+
   scale_color_manual(name = "Marginalization", values = c("High" = altoc, "Low" = bajoc, "Medium" = medioc, "Very High" = maltoc, "Very Low" = mbajoc),
                       labels = c("Very Low", "Low", "Medium", "High", "Very High"))+
   coord_fixed()+
-  geom_abline()+
+  geom_abline(intercept = 100, slope=-1)+
   # scale_x_continuous(name = "percentage language",limits = c(0,100))+
   # scale_y_continuous(name = "percentage mathematics",limits = c(0,100))+
   ggtitle("Achievement Level IV by marginalization")+
@@ -812,8 +932,6 @@ mt <- ggplot(mar_scores)+
   # geom_abline()+
   # scale_x_continuous(name = "percentage language",limits = c(0,1))+
   # scale_y_continuous(name = "percentage mathematics",limits = c(0,100))+
-  scale_x_log10()+
-  scale_y_log10()+
   ggtitle("Achievement Level IV by marginalization")+
   th+
   theme(
